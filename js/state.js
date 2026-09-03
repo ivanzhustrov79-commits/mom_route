@@ -77,6 +77,7 @@ function deepMerge(base, over) {
   return out;
 }
 let S;
+const FIRST_RUN = !localStorage.getItem(KEY);
 function migrate() {
   if (S.v < 3) { S.v = 3; S.cache.matrix = {}; save(); }
 }

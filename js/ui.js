@@ -28,7 +28,7 @@ const cur = () => stack[stack.length - 1];
 function go(v, p) { stack.push({ v, p }); render(); }
 function back() { if (stack.length > 1) stack.pop(); render(); }
 
-const TITLES = { now:'', week:'Неделя', assume:'Допущения', settings:'Настройки',
+const TITLES = { now:'', vault:'Код', week:'Неделя', assume:'Допущения', settings:'Настройки',
                  kid:'Ребёнок', act:'Занятие', place:'Адрес', notes:'Расписание из заметки' };
 
 const SVG = (d, extra = '') => `<svg viewBox="0 0 20 20" width="19" height="19" fill="none"
@@ -48,8 +48,9 @@ function render() {
   nav.hidden = !(t.v === 'now' || t.v === 'week');
   nav.innerHTML = t.v === 'now' ? ICON.cal : t.v === 'week' ? ICON.cfg : '';
   $('#crumb').textContent = t.v === 'now' ? dateLine() : TITLES[t.v] || '';
-  ({ now:renderNow, week:renderWeek, assume:renderAssume, settings:renderSettings,
-     kid:renderKid, act:renderAct, place:renderPlace, notes:renderNotes })[t.v](t.p);
+  ({ now:renderNow, vault:renderVault, week:renderWeek, assume:renderAssume,
+     settings:renderSettings, kid:renderKid, act:renderAct, place:renderPlace,
+     notes:renderNotes })[t.v](t.p);
 }
 
 /* Пн Вт Ср Чт Пт → «Пн–Пт»,  Пн Чт → «Пн Чт» */
@@ -181,6 +182,13 @@ function renderNow() {
         as.length === 1 ? 'место' : as.length < 5 ? 'места' : 'мест'}. Проверить →</button>` : '';
 }
 
+/* ── VAULT ─────────────────────────────────────────────────────────── */
+function renderVault() {
+  $('#vault-msg').textContent = '';
+  $('#vault-msg').className = 'hint';
+  setTimeout(() => $('#vault-code').focus(), 60);
+}
+
 /* ── WEEK ──────────────────────────────────────────────────────────── */
 function tripRow(x, now) {
   return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
@@ -222,10 +230,14 @@ function assumptions() {
     if (a.note && /ЗАМЕТКА/.test(a.note) && !done.includes(a.id))
       out.push({ id: a.id, who: k.name + ' · ' + a.title,
                  text: a.note.replace(/^ЗАМЕТКА:\s*/, '') });
-  for (const p of S.places)
-    if (p.approx && !done.includes('place:' + p.id))
+  for (const p of S.places) {
+    if (done.includes('place:' + p.id)) continue;
+    if (!p.address)                                     // адрес вообще не заведён
+      out.push({ id: 'place:' + p.id, who: p.name, text: 'адрес не задан' });
+    else if (p.approx)                                  // адрес есть, но дом не нашёлся
       out.push({ id: 'place:' + p.id, who: p.name,
-                 text: 'точка на карте приблизительная' + (p.address ? ' — ' + p.address : '') });
+                 text: 'точка на карте приблизительная — ' + p.address });
+  }
   return out;
 }
 
@@ -433,6 +445,20 @@ document.addEventListener('click', async e => {
     save(); invalidate(); return render();
   }
 
+  if (act === 'vault-open') {
+    const code = $('#vault-code').value.trim();
+    const msg = $('#vault-msg');
+    if (!code) { msg.textContent = 'введите код'; msg.className = 'hint bad'; return; }
+    msg.className = 'hint'; msg.textContent = 'расшифровываю…';
+    const r = await vaultOpen(code);
+    if (!r.ok) { msg.textContent = r.msg; msg.className = 'hint bad'; return; }
+    load(); invalidate();
+    stack = [{ v:'now' }];
+    await ensureMatrix(true);
+    return render();
+  }
+  if (act === 'vault') return go('vault');
+
   if (act === 'assume') return go('assume');
   if (act === 'assume-ok') {
     S.cache.okNotes = [...(S.cache.okNotes || []), b.dataset.id];
@@ -519,6 +545,8 @@ document.addEventListener('click', async e => {
 
 /* ── boot ──────────────────────────────────────────────────────────── */
 (async function boot() {
+  /* первый запуск и рядом лежит зашифрованное расписание — спросим код */
+  if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
   render();
   initSW();
   keepAwake(true);

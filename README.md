@@ -123,6 +123,30 @@ The app ships with an empty template. Home addresses, children's names and
 schedules are entered on the device and never leave it — there is no server and
 no analytics. Keep real schedules out of this repository.
 
+### Optional: an encrypted schedule in the repo
+
+So a second device does not need a file transfer, a schedule can be committed as
+`data.enc.json` — AES-GCM-256 with the key derived from a passphrase by
+PBKDF2-SHA256, 600 000 iterations:
+
+```
+node tools/encrypt_schedule.js "четыре случайных слова подряд"
+git add data.enc.json && git commit -m "schedule" && git push
+```
+
+On a device with no data yet, the app then asks for the passphrase instead of
+starting empty. Unlocking takes about 150 ms on a desktop.
+
+**Understand what this trades away.** The ciphertext is public and stays public —
+forks, mirrors and git history outlive any later deletion, so the only thing
+standing between a stranger and the plaintext is the passphrase. Changing it
+later does not help: the old blob remains in history and still opens with the old
+passphrase. A PIN or a memorable sentence is broken offline; use several
+genuinely random words. The tool refuses anything under 16 characters or 3 words.
+
+If the data is a child's daily whereabouts, `Настройки → Данные → Импорт JSON`
+publishes nothing at all and costs one minute per device. Prefer it.
+
 ## Running locally
 
 ```

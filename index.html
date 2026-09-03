@@ -35,6 +35,17 @@
     <div id="notes-strip"></div>
   </section>
 
+  <!-- ───────────────────────── VAULT ───────────────────────── -->
+  <section id="v-vault" class="view" hidden>
+    <div id="vault-box">
+      <div class="cap">Расписание закрыто кодом</div>
+      <input id="vault-code" type="password" inputmode="text" autocomplete="off"
+             spellcheck="false" placeholder="кодовая фраза">
+      <button class="row add" data-act="vault-open">Открыть</button>
+      <div class="hint" id="vault-msg"></div>
+    </div>
+  </section>
+
   <!-- ───────────────────────── WEEK ───────────────────────── -->
   <section id="v-week" class="view" hidden>
     <div id="week"></div>
@@ -61,6 +72,7 @@
     <div class="cap sec">Заметка</div>
     <div class="list">
       <button class="row" data-act="notes">Импорт расписания<i id="notes-when"></i></button>
+      <button class="row" data-act="vault">Загрузить по коду</button>
     </div>
 
     <div class="cap sec">Общее</div>
@@ -121,6 +133,7 @@
 <script src="js/travel.js"></script>
 <script src="js/planner.js"></script>
 <script src="js/notes.js"></script>
+<script src="js/secret.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/ui.js"></script>
 </body>

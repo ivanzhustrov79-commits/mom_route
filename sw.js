@@ -1,7 +1,7 @@
 /* minimal service worker: offline shell + notification click focus */
-const C = 'momroute-2';
+const C = 'momroute-3';
 const FILES = ['./','./index.html','./style.css','./manifest.webmanifest',
-  './js/state.js','./js/travel.js','./js/planner.js','./js/notes.js','./js/notify.js','./js/ui.js'];
+  './js/state.js','./js/travel.js','./js/planner.js','./js/notes.js','./js/secret.js','./js/notify.js','./js/ui.js'];
 self.addEventListener('install', e => { self.skipWaiting();
   e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).catch(()=>{})); });
 self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });

@@ -41,6 +41,15 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #hero.hot #hero-num,#hero.hot #hero-label{color:var(--hot)}
 #hero.idle #hero-num{font-size:34px;font-weight:300;letter-spacing:-.02em;line-height:1.2}
 
+/* vault */
+#vault-box{padding:44px 0 0}
+#vault-box .cap{margin-bottom:22px}
+#vault-code{width:100%;background:var(--field);border:0;border-radius:9px;color:var(--ink);
+  font:inherit;font-size:17px;padding:15px 14px;-webkit-appearance:none;appearance:none}
+#vault-box .row.add{margin-top:16px;border-bottom:0;color:var(--ink);font-size:16px}
+#vault-msg{margin-top:18px}
+#vault-msg.bad{color:var(--hot)}
+
 /* week */
 .wd{margin:34px 0 2px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
 .wd.today{color:var(--ink)}
