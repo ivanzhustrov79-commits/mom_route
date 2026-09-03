@@ -30,19 +30,28 @@ if (!code) {
   process.exit(1);
 }
 
-/* грубая оценка: сколько независимых «кусков» в фразе */
-const words = code.split(/\s+/).filter(Boolean).length;
-if (code.length < 16 || words < 3) {
-  console.error(`\nКодовая фраза слишком короткая: ${code.length} символов, слов ${words}.`);
-  console.error('Файл ляжет в публичный репозиторий, подбор идёт офлайн и без ограничений.');
-  console.error('Нужно минимум 16 символов и хотя бы 3 слова.');
-  console.error('');
-  console.error('И слова должны быть СЛУЧАЙНЫМИ, а не осмысленной фразой:');
-  console.error('  «кактус ржавый пельмень выборы» — годится;');
-  console.error('  «маша и медведь пошли гулять»  — подбирается перебором.');
-  console.error('Проще всего сгенерировать парольную фразу в менеджере паролей.');
-  console.error('');
-  process.exit(1);
+/* Никаких требований к фразе — пусть будет любая, какую удобно помнить.
+   Но честно скажем, насколько она держит удар.                        */
+function strength(pw) {
+  const words = pw.split(/\s+/).filter(Boolean).length;
+  let pool = 0;
+  if (/[a-z]/.test(pw) || /[а-яё]/.test(pw)) pool += 33;
+  if (/[A-Z]/.test(pw) || /[А-ЯЁ]/.test(pw)) pool += 33;
+  if (/[0-9]/.test(pw)) pool += 10;
+  if (/[^\wа-яёА-ЯЁ]/.test(pw)) pool += 15;
+  /* осмысленный текст несёт куда меньше, чем длина обещает */
+  const raw = pw.length * Math.log2(pool || 26);
+  return { bits: Math.round(words > 1 ? Math.min(raw, words * 10) : raw * 0.5), words };
+}
+
+const st = strength(code);
+console.log(`
+Фраза: ${code.length} символов, слов ${st.words}, примерно ${st.bits} бит.`);
+if (st.bits < 45) {
+  console.log('Это немного. Файл лежит в открытом репозитории, и подбор идёт');
+  console.log('офлайн, без ограничений по числу попыток. Более длинная или менее');
+  console.log('предсказуемая фраза заметно надёжнее — но решать вам.');
+  console.log('Готовый вариант: node tools/encrypt_schedule.js --suggest');
 }
 
 const ITER = 600000;   // PBKDF2-SHA256, рекомендация OWASP

@@ -111,6 +111,9 @@ const invalidate = () => { PLAN = null; };
 /* ── NOW ───────────────────────────────────────────────────────────── */
 const kidsOf = t => t.kidIds.map(k => kid(k)?.name).filter(Boolean).join(', ');
 const destOf = t => t.stops.map(s => place(s.placeId)?.name || '?').join(' → ');
+/* каждая точка со своим временем — «дома» маме не нужно */
+const stopsOf = t => t.stops.map(s =>
+  `${esc(place(s.placeId)?.name || '?')} <b>${m2hm(s.arrive)}</b>`).join(' → ');
 
 function renderNow() {
   const p = plan(), t = nowMin(), nx = nextTrip(p, t);
@@ -134,8 +137,8 @@ function renderNow() {
       : left < 90 ? `<span>${left}</span><i>мин</i>`
                   : `<span>${(left / 60 | 0)}:${String(left % 60).padStart(2, '0')}</span><i>ч</i>`;
     $('#hero-sub').innerHTML =
-      `<b>${esc(destOf(nx))}</b><br><span>${esc(kidsOf(nx))}</span><br>` +
-      `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} ${m2hm(nx.depart)} · на месте ${m2hm(nx.stops[0].arrive)}` +
+      `<b>${stopsOf(nx)}</b><br><span>${esc(kidsOf(nx))}</span><br>` +
+      `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} ${m2hm(nx.depart)}` +
       (nx.mode === 'walk' ? ' · пешком' : ` · ${Math.round(nx.driveMin)} мин за рулём`) + `</span>`;
   }
 
@@ -194,8 +197,8 @@ function tripRow(x, now) {
   return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
       <div class="t">${m2hm(x.depart)}</div>
       <div class="b">
-        <div class="d">${esc(destOf(x))} <span style="color:var(--mut)">${esc(kidsOf(x))}</span></div>
-        <div class="m">на месте ${m2hm(x.stops[0].arrive)} · дома ${m2hm(x.home)}${
+        <div class="d">${stopsOf(x)}</div>
+        <div class="m">${esc(kidsOf(x))}${
           x.mode === 'walk' ? '' : ` · ${Math.round(x.driveMin)} мин за рулём`}${
           x.ride > S.cfg.maxRide && x.rideKid
             ? ` · ${esc(kid(x.rideKid)?.name || '')} в машине ${dur(x.ride)}` : ''}</div>

@@ -137,12 +137,16 @@ git add data.enc.json && git commit -m "schedule" && git push
 On a device with no data yet, the app then asks for the passphrase instead of
 starting empty. Unlocking takes about 150 ms on a desktop.
 
+Any phrase is accepted — the tool estimates its strength, says so, and gets out
+of the way. `--suggest` prints a random five-word phrase if you would rather not
+invent one.
+
 **Understand what this trades away.** The ciphertext is public and stays public —
 forks, mirrors and git history outlive any later deletion, so the only thing
 standing between a stranger and the plaintext is the passphrase. Changing it
 later does not help: the old blob remains in history and still opens with the old
-passphrase. A PIN or a memorable sentence is broken offline; use several
-genuinely random words. The tool refuses anything under 16 characters or 3 words.
+passphrase. A PIN or a familiar saying is broken offline in minutes; length and
+unpredictability are what count.
 
 If the data is a child's daily whereabouts, `Настройки → Данные → Импорт JSON`
 publishes nothing at all and costs one minute per device. Prefer it.

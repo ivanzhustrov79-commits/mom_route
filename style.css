@@ -90,6 +90,7 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .trip .t{width:52px;flex:none;font-size:19px;font-weight:400}
 .trip .b{flex:1;min-width:0}
 .trip .b .d{font-size:15px}
+.trip .b .d b{font-weight:500}
 .trip .b .m{font-size:12px;color:var(--mut);margin-top:3px}
 .trip.done{opacity:.34}
 .trip .w{flex:none;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
