@@ -85,15 +85,23 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #offer .qb button:last-child{color:var(--mut)}
 #offer .qb button:active{opacity:.5}
 
-/* trips */
-.trip{display:flex;gap:16px;padding:16px 0;border-top:1px solid var(--line);align-items:baseline}
-.trip .t{width:52px;flex:none;font-size:19px;font-weight:400}
-.trip .b{flex:1;min-width:0}
-.trip .b .d{font-size:15px}
-.trip .b .d b{font-weight:500}
-.trip .b .m{font-size:12px;color:var(--mut);margin-top:3px}
+/* trips — маршрут «из дома … и домой» */
+.trip{padding:18px 0 16px;border-top:1px solid var(--line)}
 .trip.done{opacity:.34}
-.trip .w{flex:none;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.th{display:flex;align-items:center;gap:10px}
+.th .t{font-size:21px;font-weight:400;letter-spacing:-.01em}
+.th .ic{display:inline-flex;color:var(--ink);opacity:.75}
+.th .ic svg{width:17px;height:17px}
+.th .lbl{font-size:12px;color:var(--mut)}
+.leg{display:flex;gap:14px;padding:9px 0 0 2px}
+.leg b{width:46px;flex:none;font-weight:400;font-size:14px;color:var(--mut)}
+.leg span{font-size:15px}
+.leg i{display:block;font-style:normal;font-size:12px;color:var(--mut);margin-top:2px}
+.leg.home span{color:var(--mut);font-size:14px}
+#hero-sub .hlead{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--mut);margin-bottom:6px}
+#hero-sub .hlead .ic{display:inline-flex;color:var(--ink);opacity:.75}
+#hero-sub .hlead .ic svg{width:16px;height:16px}
+#hero-sub .legs .leg{padding-top:10px}
 
 /* lists */
 .list{border-top:1px solid var(--line)}

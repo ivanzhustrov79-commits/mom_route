@@ -35,7 +35,9 @@ const SVG = (d, extra = '') => `<svg viewBox="0 0 20 20" width="19" height="19" 
   stroke="currentColor" stroke-width="1.4" stroke-linecap="round">${d}${extra}</svg>`;
 const ICON = {
   cal:  SVG('<rect x="2.7" y="4.2" width="14.6" height="13.1" rx="1.6"/><path d="M2.7 8.2h14.6M6.8 2.6v3.2M13.2 2.6v3.2"/>'),
-  cfg:  SVG('<path d="M3 6.7h14M3 13.3h14"/><circle cx="7.6" cy="6.7" r="2.1" fill="var(--bg)"/><circle cx="12.6" cy="13.3" r="2.1" fill="var(--bg)"/>')
+  cfg:  SVG('<path d="M3 6.7h14M3 13.3h14"/><circle cx="7.6" cy="6.7" r="2.1" fill="var(--bg)"/><circle cx="12.6" cy="13.3" r="2.1" fill="var(--bg)"/>'),
+  walk: SVG('<circle cx="10.2" cy="3.4" r="1.7"/><path d="M10.2 6v5.2M10.2 11.2L7.4 17M10.2 11.2L13 17M7.1 8.1l6.2-1.1"/>'),
+  car:  SVG('<path d="M3.4 13.6v-2.3l1.8-3.5a1.5 1.5 0 011.3-.8h7a1.5 1.5 0 011.3.8l1.8 3.5v2.3"/><path d="M3.4 11.3h13.2"/><circle cx="6.6" cy="13.6" r="1.5"/><circle cx="13.4" cy="13.6" r="1.5"/>')
 };
 
 function render() {
@@ -111,9 +113,19 @@ const invalidate = () => { PLAN = null; };
 /* ── NOW ───────────────────────────────────────────────────────────── */
 const kidsOf = t => t.kidIds.map(k => kid(k)?.name).filter(Boolean).join(', ');
 const destOf = t => t.stops.map(s => place(s.placeId)?.name || '?').join(' → ');
-/* каждая точка со своим временем — «дома» маме не нужно */
-const stopsOf = t => t.stops.map(s =>
-  `${esc(place(s.placeId)?.name || '?')} <b>${m2hm(s.arrive)}</b>`).join(' → ');
+/* Выезд показываем как маршрут: из дома → остановки с действием → домой.
+   Без этого непонятно, откуда машина взялась и куда потом делись дети. */
+const namesOf = ids => ids.map(i => kid(i)?.name).filter(Boolean).join(', ');
+
+function legsHtml(t) {
+  const rows = t.stops.map(s =>
+    `<div class="leg"><b>${m2hm(s.arrive)}</b><div>
+       <span>${esc(place(s.placeId)?.name || '?')}</span>
+       <i>${s.kind === 'drop' ? 'отвезти' : 'забрать'}: ${esc(namesOf(s.kidIds))}</i>
+     </div></div>`);
+  rows.push(`<div class="leg home"><b>${m2hm(t.home)}</b><div><span>дом</span></div></div>`);
+  return rows.join('');
+}
 
 function renderNow() {
   const p = plan(), t = nowMin(), nx = nextTrip(p, t);
@@ -137,9 +149,10 @@ function renderNow() {
       : left < 90 ? `<span>${left}</span><i>мин</i>`
                   : `<span>${(left / 60 | 0)}:${String(left % 60).padStart(2, '0')}</span><i>ч</i>`;
     $('#hero-sub').innerHTML =
-      `<b>${stopsOf(nx)}</b><br><span>${esc(kidsOf(nx))}</span><br>` +
-      `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} ${m2hm(nx.depart)}` +
-      (nx.mode === 'walk' ? ' · пешком' : ` · ${Math.round(nx.driveMin)} мин за рулём`) + `</span>`;
+      `<div class="hlead"><span class="ic">${nx.mode === 'walk' ? ICON.walk : ICON.car}</span>` +
+      `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} из дома в ${m2hm(nx.depart)}` +
+      (nx.mode === 'walk' ? '' : ` · ${Math.round(nx.driveMin)} мин за рулём`) + `</span></div>` +
+      `<div class="legs">${legsHtml(nx)}</div>`;
   }
 
   const cf = dayConflicts(new Date());
@@ -166,9 +179,9 @@ function renderNow() {
   $('#trips').innerHTML = p.trips.map(x => tripRow(x, t)).join('')
     + p.skipped.map(s => `
     <div class="trip done">
-      <div class="t">${m2hm(s.w0)}</div>
-      <div class="b"><div class="d">${esc(place(s.placeId)?.name || '')}</div>
-      <div class="m">дойдут сами — отдельный выезд не окупается</div></div>
+      <div class="th"><span class="t">${m2hm(s.w0)}</span>
+        <span class="lbl">${esc(place(s.placeId)?.name || '')} — дойдут сами,
+          отдельный выезд не окупается</span></div>
     </div>`).join('');
 
   const st = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
@@ -194,16 +207,16 @@ function renderVault() {
 
 /* ── WEEK ──────────────────────────────────────────────────────────── */
 function tripRow(x, now) {
+  const extra = (x.mode === 'walk' ? '' : `${Math.round(x.driveMin)} мин за рулём`) +
+    (x.ride > S.cfg.maxRide && x.rideKid
+      ? ` · ${esc(kid(x.rideKid)?.name || '')} в машине ${dur(x.ride)}` : '');
   return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
-      <div class="t">${m2hm(x.depart)}</div>
-      <div class="b">
-        <div class="d">${stopsOf(x)}</div>
-        <div class="m">${esc(kidsOf(x))}${
-          x.mode === 'walk' ? '' : ` · ${Math.round(x.driveMin)} мин за рулём`}${
-          x.ride > S.cfg.maxRide && x.rideKid
-            ? ` · ${esc(kid(x.rideKid)?.name || '')} в машине ${dur(x.ride)}` : ''}</div>
+      <div class="th">
+        <span class="t">${m2hm(x.depart)}</span>
+        <span class="ic">${x.mode === 'walk' ? ICON.walk : ICON.car}</span>
+        <span class="lbl">из дома${extra ? ' · ' + extra : ''}</span>
       </div>
-      ${x.mode === 'walk' ? '<div class="w">пешком</div>' : ''}
+      ${legsHtml(x)}
     </div>`;
 }
 
