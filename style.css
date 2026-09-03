@@ -54,6 +54,10 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .wd{margin:34px 0 2px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
 .wd.today{color:var(--ink)}
 .wd:first-child{margin-top:8px}
+.cls{display:flex;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+.cls b{width:46px;flex:none;font-weight:400;font-size:13px;line-height:1.45;color:var(--mut)}
+.cls span{font-size:15px}
+.cls i{display:block;font-style:normal;font-size:12px;color:var(--mut);margin-top:3px;line-height:1.45}
 .wempty{padding:14px 0;border-top:1px solid var(--line);font-size:14px;color:var(--mut)}
 .wconf{padding:12px 0;border-top:1px solid var(--hot);font-size:13px;color:var(--hot);line-height:1.5}
 

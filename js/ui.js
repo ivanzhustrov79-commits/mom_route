@@ -220,20 +220,43 @@ function tripRow(x, now) {
     </div>`;
 }
 
+/* Календарь — только расписание занятий, без развоза.
+   Одно и то же занятие у нескольких детей — одна строка.               */
+function classesOn(date) {
+  const dow = date.getDay(), dk = dayKey(date), rows = [];
+  for (const k of S.kids) for (const a of k.activities) {
+    if (!a.days.includes(dow)) continue;
+    if (a.from && dk < a.from) continue;
+    if (a.until && dk > a.until) continue;
+    const key = a.title + '|' + a.placeId + '|' + a.start + '|' + a.end;
+    const m = rows.find(r => r.key === key);
+    if (m) m.kids.push(k.name);
+    else rows.push({ key, title: a.title, placeId: a.placeId,
+                     start: a.start, end: a.end, kids: [k.name] });
+  }
+  return rows.sort((x, y) => (x.start - y.start) || (x.end - y.end));
+}
+
 function renderWeek() {
   const t0 = new Date(), out = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i);
-    const p = planDay(d), cf = dayConflicts(d);
     out.push(`<div class="wd ${i === 0 ? 'today' : ''}">${
       i === 0 ? 'сегодня · ' : ''}${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}</div>`);
-    if (cf.length) out.push(cf.map(c =>
-      `<div class="wconf">${esc(c.kid.name)}: «${esc(c.from.title)}» до ${m2hm(c.from.end)},
-       «${esc(c.to.title)}» с ${m2hm(c.to.start)}, дорога ${Math.round(c.road)} мин —
-       не хватает ${Math.round(c.short)} мин</div>`).join(''));
-    out.push(p.trips.length
-      ? p.trips.map(x => tripRow(x, i === 0 ? nowMin() : null)).join('')
-      : '<div class="wempty">выездов нет</div>');
+    for (const c of dayConflicts(d))
+      out.push(`<div class="wconf">${esc(c.kid.name)}: «${esc(c.from.title)}» до ${m2hm(c.from.end)},
+        «${esc(c.to.title)}» с ${m2hm(c.to.start)}, дорога ${Math.round(c.road)} мин —
+        не хватает ${Math.round(c.short)} мин</div>`);
+    const rows = classesOn(d);
+    out.push(rows.length
+      ? rows.map(c => `<div class="cls">
+          <b>${m2hm(c.start)}<br>${m2hm(c.end)}</b>
+          <div><span>${esc(c.title)}</span>
+            <i>${esc(c.kids.join(', '))}${
+              (place(c.placeId)?.name || '') === c.title ? ''
+                : ' · ' + esc(place(c.placeId)?.name || '?')}</i></div>
+        </div>`).join('')
+      : '<div class="wempty">занятий нет</div>');
   }
   $('#week').innerHTML = out.join('');
 }
