@@ -32,8 +32,8 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 /* hero */
 #hero{padding:34px 0 26px;min-height:calc(100vh - 104px);
       min-height:calc(100dvh - 104px);display:flex;flex-direction:column}
-#hero .grow{flex:1;min-height:26px}
-#hero-more{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+#hero .grow{flex:1;min-height:0;order:2}
+#hero-more{margin-top:26px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 #hero-sub .legs .leg span{font-size:17px}
 #hero-sub .legs .leg b{font-size:15px}
 #trips-cap{margin:0 0 4px}
@@ -78,6 +78,10 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .wconf{padding:12px 0;border-top:1px solid var(--hot);font-size:13px;color:var(--hot);line-height:1.5}
 
 /* assumptions */
+#update-strip{margin-top:30px}
+#update-strip button{background:none;border:0;padding:0 0 14px;color:var(--free);font:inherit;
+  font-size:12px;text-align:left;cursor:pointer;border-bottom:1px solid var(--line);width:100%}
+#update-strip button:active{opacity:.5}
 #assume-strip{margin-top:30px}
 #assume-strip button{background:none;border:0;padding:0;color:var(--mut);font:inherit;
   font-size:12px;text-align:left;cursor:pointer;border-bottom:1px solid var(--line);

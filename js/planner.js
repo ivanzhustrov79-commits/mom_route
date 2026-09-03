@@ -305,7 +305,36 @@ function spareBlocks(p, date = new Date(), minMin = 20) {
   return out.sort((a, b) => a.from - b.from);
 }
 
-/* the next outing that hasn't departed yet */
+/* 9 ── день по шагам ────────────────────────────────────────────────
+   Один шаг = одно перемещение: отсюда — туда. Маме за раз нужен ровно
+   один, а не весь маршрут целиком.                                    */
+function daySteps(p, date = new Date()) {
+  const dow = date.getDay(), home = homePlace().id, out = [];
+  for (const t of p.trips) {
+    let leave = t.depart, from = home;
+    for (const s of t.stops) {
+      out.push({ leave, from, to: s.placeId, arrive: s.arrive, kind: s.kind,
+                 kidIds: s.kidIds, teacher: s.teacher, title: s.title,
+                 mode: t.mode, trip: t });
+      leave = s.arrive + s.service; from = s.placeId;
+    }
+    out.push({ leave, from, to: home, arrive: t.home, kind: 'home',
+               kidIds: [], mode: t.mode, trip: t });
+  }
+  return out.sort((a, b) => a.leave - b.leave);
+}
+
+/* сколько минут занимает сам шаг */
+function stepMinutes(st, date = new Date()) {
+  return st.mode === 'walk' ? walk(st.from, st.to)
+                            : drive(st.from, st.to, st.leave, date.getDay());
+}
+
+/* Ближайший шаг: пока не приехали — это всё ещё текущий шаг, а не следующий.
+   Иначе на полпути экран показывал бы уже другое место.                  */
+function nextStep(p, t = nowMin(), date = new Date()) {
+  return daySteps(p, date).find(s => s.arrive > t - 1) || null;
+}
 function nextTrip(plan, t = nowMin()) {
   return plan.trips.find(x => x.depart > t - 3) || null;
 }

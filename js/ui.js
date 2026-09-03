@@ -6,6 +6,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 let stack = [{ v:'now' }], PLAN = null, planDK = null;
 let WEEKROWS = [];                 // строки календаря текущего рендера
 let FLASH = '';                    // короткое пояснение к последнему действию
+let VAULT_NEW = false;             // в репозитории лежит расписание свежее нашего
 let EDITING = { refs: [] };        // какие занятия правит открытый редактор
 
 /* ── field binding ─────────────────────────────────────────────────── */
@@ -155,35 +156,54 @@ function aloneCard(r) {
 }
 
 function renderNow() {
-  const p = plan(), t = nowMin(), nx = nextTrip(p, t);
+  const p = plan(), t = nowMin(), st = nextStep(p, t);
   const hero = $('#hero');
   hero.className = '';
 
-  if (!nx) {
+  if (!st) {
     hero.classList.add('idle');
     $('#hero-label').textContent = 'Сегодня';
     $('#hero-num').innerHTML = p.trips.length ? 'Все выезды позади' : 'Выездов нет';
     $('#hero-sub').innerHTML = p.trips.length
       ? `<span>Последний в ${m2hm(p.trips[p.trips.length - 1].depart)}</span>` : '';
   } else {
-    const left = Math.max(0, Math.round(nx.depart - t));
-    if (left <= 10) hero.classList.add('hot');
-    $('#hero-label').textContent = left <= 0
-      ? (nx.mode === 'walk' ? 'Пора выходить' : 'Пора выезжать')
-      : (nx.mode === 'walk' ? 'Выход через' : 'Выезд через');
-    $('#hero-num').innerHTML = left <= 0
-      ? `<span>сейчас</span>`
-      : left < 90 ? `<span>${left}</span><i>мин</i>`
-                  : `<span>${(left / 60 | 0)}:${String(left % 60).padStart(2, '0')}</span><i>ч</i>`;
+    const onFoot = st.mode === 'walk';
+    const fromHome = !!place(st.from)?.home;
+    const toLeave = st.leave - t, toArrive = st.arrive - t;
+    const big = n => n < 90 ? `<span>${n}</span><i>мин</i>`
+                            : `<span>${(n / 60 | 0)}:${String(n % 60).padStart(2, '0')}</span><i>ч</i>`;
+
+    if (toLeave > 0.5) {                       // ещё дома
+      if (toLeave <= 10) hero.classList.add('hot');
+      $('#hero-label').textContent = onFoot ? 'Выход через' : 'Выезд через';
+      $('#hero-num').innerHTML = big(Math.round(toLeave));
+    } else if (toLeave > -2) {                 // ровно сейчас
+      hero.classList.add('hot');
+      $('#hero-label').textContent = onFoot ? 'Пора выходить' : 'Пора выезжать';
+      $('#hero-num').innerHTML = `<span>сейчас</span>`;
+    } else {                                   // уже в пути
+      $('#hero-label').textContent = onFoot ? 'В пути пешком, дойдём через'
+                                            : 'В пути, приедем через';
+      $('#hero-num').innerHTML = big(Math.max(0, Math.round(toArrive)));
+    }
+
+    const mins = Math.round(stepMinutes(st));
+    const lead = `${onFoot ? 'выход' : 'выезд'} ${fromHome ? 'из дома' : 'от «' + esc(place(st.from)?.name || '') + '»'}` +
+                 ` в ${m2hm(st.leave)} · ${mins} мин ${onFoot ? 'пешком' : 'в пути'}`;
+    const body = st.kind === 'home'
+      ? `<div class="leg home"><b>${m2hm(st.arrive)}</b><div><span>дом</span></div></div>`
+      : `<div class="leg"><b>${m2hm(st.arrive)}</b><div>
+           <span>${esc(place(st.to)?.name || '?')}</span>
+           <i>${st.kind === 'drop' ? 'отвезти' : 'забрать'}: ${namesOf(st.kidIds)}</i>
+           ${st.teacher ? `<i>${esc(st.teacher)}</i>` : ''}
+         </div></div>`;
     $('#hero-sub').innerHTML =
-      `<div class="hlead"><span class="ic">${nx.mode === 'walk' ? ICON.walk : ICON.car}</span>` +
-      `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} из дома в ${m2hm(nx.depart)}` +
-      (nx.mode === 'walk' ? '' : ` · ${Math.round(nx.driveMin)} мин за рулём`) + `</span></div>` +
-      `<div class="legs">${legsHtml(nx, true)}</div>`;
+      `<div class="hlead"><span class="ic">${onFoot ? ICON.walk : ICON.car}</span><span>${lead}</span></div>` +
+      `<div class="legs">${body}</div>`;
   }
 
-  const rest = p.trips.filter(x => x !== nx).length + unattended(p, new Date()).length;
-  $('#hero-more').textContent = rest ? 'дальше сегодня ↓' : '';
+  const ahead = p.trips.filter(x => x.home > t - 3).length;
+  $('#hero-more').textContent = ahead ? 'дальше сегодня ↓' : '';
 
   const cf = dayConflicts(new Date());
   const wn = $('#warn');
@@ -208,9 +228,9 @@ function renderNow() {
 
   /* весь день одной лентой: выезды, свободные окна, «дойдут сами» */
   const items = [];
-  for (const x of p.trips)  items.push({ at: x.depart, html: tripRow(x, t) });
-  for (const r of unattended(p, new Date())) items.push({ at: r.at, html: aloneCard(r) });
-  for (const g of spareBlocks(p, new Date())) items.push({ at: g.from, html: spareCard(g) });
+  for (const x of p.trips) if (x.home > t - 3) items.push({ at: x.depart, html: tripRow(x, t) });
+  for (const r of unattended(p, new Date())) if (r.at > t - 3) items.push({ at: r.at, html: aloneCard(r) });
+  for (const g of spareBlocks(p, new Date())) if (g.to > t) items.push({ at: g.from, html: spareCard(g) });
   items.sort((a, b) => a.at - b.at);
 
   const forced = ((S.cache.pickUp || {})[dayKey()] || []).length;
@@ -218,13 +238,16 @@ function renderNow() {
     (FLASH ? `<div class="flash">${esc(FLASH)}</div>` : '') +
     (forced ? `<button class="undo" data-act="pick-reset">забираю сама: ${forced} — вернуть как было</button>` : '');
 
-  const st = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
+  const src = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
                estimate:'оценка по прямой', loading:'считаю маршруты…', idle:'' }[matStatus] || '';
   const sy = S.cache.syncedAt
     ? 'заметка: ' + new Date(S.cache.syncedAt).toLocaleString('ru-RU',
         { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
     : 'заметка не подключена';
-  $('#notes-strip').textContent = [st, sy].filter(Boolean).join(' · ');
+  $('#notes-strip').textContent = [src, sy].filter(Boolean).join(' · ');
+
+  $('#update-strip').innerHTML = VAULT_NEW
+    ? `<button data-act="vault">Расписание обновилось — загрузить по коду →</button>` : '';
 
   const as = assumptions();
   $('#assume-strip').innerHTML = as.length
@@ -432,7 +455,8 @@ function renderSettings() {
      <div class="hint" id="ytest-out"></div>`;
 
   $('#perm-st').textContent = ('Notification' in window) ? Notification.permission : 'нет';
-  $('#ver').textContent = 'Маршрут · данные хранятся только на устройстве';
+  $('#ver').textContent = 'Маршрут ' + (S.cache.appVersion || '') +
+    ' · данные хранятся только на устройстве';
 }
 
 /* ── АДРЕС ─────────────────────────────────────────────────────────── */
@@ -462,6 +486,33 @@ function renderNotes() {
     fWide('URL источника', S.cfg.syncUrl, v => S.cfg.syncUrl = v) +
     fNum('Опрашивать раз в, ч', S.cfg.syncHours, v => S.cfg.syncHours = v, 1, 24) +
     `<button class="row add" data-act="sync">Синхронизировать сейчас</button>`;
+}
+
+/* ── обновление приложения ─────────────────────────────────────────
+   Установленный на телефон PWA сам за кодом не следит. Сверяем версию
+   с той, что лежит на сайте, и один раз перезагружаемся начисто.     */
+async function dropCaches() {
+  try {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+}
+
+async function liveVersion() {
+  try { return (await (await fetch('version.json?' + Date.now(), { cache:'no-store' })).json()).v; }
+  catch { return null; }
+}
+
+async function checkAppUpdate() {
+  const v = await liveVersion();
+  if (!v) return;
+  if (!S.cache.appVersion) { S.cache.appVersion = v; save(); return; }
+  if (v === S.cache.appVersion) return;
+  if (sessionStorage.getItem('mr-upd') === v) return;   // уже пробовали в этой сессии
+  sessionStorage.setItem('mr-upd', v);
+  S.cache.appVersion = v; save();
+  await dropCaches();
+  location.reload();
 }
 
 /* ── решения мамы на сегодня ───────────────────────────────────────── */
@@ -612,7 +663,9 @@ document.addEventListener('click', async e => {
     msg.className = 'hint'; msg.textContent = 'расшифровываю…';
     const r = await vaultOpen(code);
     if (!r.ok) { msg.textContent = r.msg; msg.className = 'hint bad'; return; }
-    load(); invalidate();
+    load();
+    S.cache.vaultTag = r.tag; save();      // запомним версию, чтобы заметить следующую
+    VAULT_NEW = false; invalidate();
     stack = [{ v:'now' }];
     await ensureMatrix(true);
     return render();
@@ -682,6 +735,13 @@ document.addEventListener('click', async e => {
         (r.delay ? `<br>задержка из-за пробок: ${Math.round(r.delay / 60)} мин` : '');
     return;
   }
+  if (act === 'app-update') {
+    b.textContent = 'обновляю…';
+    const v = await liveVersion();
+    S.cache.appVersion = v || S.cache.appVersion; save();
+    await dropCaches();
+    return location.reload();
+  }
   if (act === 'perm') { await askPerm(); return render(); }
   if (act === 'test') { return fire('Проверка', 'Уведомления работают', 'test'); }
 
@@ -708,6 +768,14 @@ document.addEventListener('click', async e => {
 (async function boot() {
   if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
   render();
+
+  checkAppUpdate();
+
+  /* расписание в репозитории могли перешифровать — заметим это сами */
+  if (!FIRST_RUN && S.cache.vaultTag) vaultTag().then(tag => {
+    if (tag && tag !== S.cache.vaultTag) { VAULT_NEW = true; if (cur().v === 'now') renderNow(); }
+  });
+
   initSW();
   keepAwake(true);
 

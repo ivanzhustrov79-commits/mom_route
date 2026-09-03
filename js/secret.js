@@ -19,6 +19,18 @@ async function vaultKey(code, salt, iter) {
     base, { name:'AES-GCM', length:256 }, false, ['encrypt', 'decrypt']);
 }
 
+/* Метка версии: соль меняется при каждом перешифровании, так что по ней
+   видно, что в репозитории лежит уже другое расписание. Расшифровывать
+   для этого не нужно.                                                  */
+async function vaultTag() {
+  try {
+    const r = await fetch(VAULT, { cache:'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && j.salt) || null;
+  } catch { return null; }
+}
+
 /* лежит ли рядом с приложением зашифрованный файл */
 async function vaultExists() {
   try {
@@ -49,6 +61,6 @@ async function vaultOpen(code) {
     JSON.parse(text);                       // проверяем, что это действительно наш формат
     localStorage.setItem(KEY, text);
     localStorage.removeItem(FKEY);
-    return { ok:true };
+    return { ok:true, tag: j.salt };
   } catch { return { ok:false, msg:'файл расшифровался, но внутри не расписание' }; }
 }

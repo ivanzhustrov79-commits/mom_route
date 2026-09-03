@@ -4,7 +4,10 @@ const FILES = ['./','./index.html','./style.css','./manifest.webmanifest',
   './js/state.js','./js/travel.js','./js/planner.js','./js/notes.js','./js/secret.js','./js/notify.js','./js/ui.js'];
 self.addEventListener('install', e => { self.skipWaiting();
   e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).catch(()=>{})); });
-self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k !== C) await caches.delete(k);
+  await clients.claim();
+})()));
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (u.origin !== location.origin) return;             // never cache API calls
