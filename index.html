@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<title>Маршрут</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="bar">
+    <button id="back" class="ico" hidden>&larr;</button>
+    <span id="crumb"></span>
+    <button id="nav" class="ico"></button>
+  </header>
+
+  <!-- ───────────────────────── NOW ───────────────────────── -->
+  <section id="v-now" class="view">
+    <div id="hero">
+      <div id="hero-label" class="cap"></div>
+      <div id="hero-num"><span id="cd">—</span><i id="cd-u"></i></div>
+      <div id="hero-sub"></div>
+    </div>
+    <div id="warn" hidden></div>
+    <div id="offer" hidden></div>
+    <div id="trips"></div>
+    <div id="assume-strip"></div>
+    <div id="notes-strip"></div>
+  </section>
+
+  <!-- ───────────────────────── WEEK ───────────────────────── -->
+  <section id="v-week" class="view" hidden>
+    <div id="week"></div>
+  </section>
+
+  <!-- ───────────────────────── ASSUMPTIONS ───────────────────────── -->
+  <section id="v-assume" class="view" hidden>
+    <p class="hint">Что пришлось домыслить, когда я разбирал заметку.
+      Отметьте галочкой то, что проверили — оно исчезнет.</p>
+    <div id="assume-list" class="list"></div>
+    <button class="row add" data-act="assume-clear">Проверено всё</button>
+  </section>
+
+  <!-- ───────────────────────── SETTINGS ───────────────────────── -->
+  <section id="v-settings" class="view" hidden>
+    <div class="cap sec">Дети</div>
+    <div id="kid-list" class="list"></div>
+    <button class="row add" data-act="add-kid">+ ребёнок</button>
+
+    <div class="cap sec">Адреса</div>
+    <div id="place-list" class="list"></div>
+    <button class="row add" data-act="add-place">+ адрес</button>
+
+    <div class="cap sec">Заметка</div>
+    <div class="list">
+      <button class="row" data-act="notes">Импорт расписания<i id="notes-when"></i></button>
+    </div>
+
+    <div class="cap sec">Общее</div>
+    <div id="gen" class="list"></div>
+
+    <div class="cap sec">Уведомления</div>
+    <div class="list">
+      <button class="row" data-act="perm">Разрешить уведомления<i id="perm-st"></i></button>
+      <button class="row" data-act="test">Тестовое уведомление</button>
+    </div>
+
+    <div class="cap sec">Данные</div>
+    <div class="list">
+      <button class="row" data-act="export">Экспорт JSON</button>
+      <button class="row" data-act="import">Импорт JSON</button>
+      <button class="row danger" data-act="reset">Сбросить всё</button>
+    </div>
+    <div id="ver" class="foot"></div>
+  </section>
+
+  <!-- ───────────────────────── KID ───────────────────────── -->
+  <section id="v-kid" class="view" hidden>
+    <div id="kid-head"></div>
+    <div class="cap sec">Занятия</div>
+    <div id="act-list" class="list"></div>
+    <button class="row add" data-act="add-activity">+ занятие</button>
+    <button class="row danger" data-act="del-kid">Удалить ребёнка</button>
+  </section>
+
+  <!-- ───────────────────────── ACTIVITY ───────────────────────── -->
+  <section id="v-act" class="view" hidden>
+    <div id="act-form"></div>
+    <button class="row danger" data-act="del-activity">Удалить занятие</button>
+  </section>
+
+  <!-- ───────────────────────── PLACE ───────────────────────── -->
+  <section id="v-place" class="view" hidden>
+    <div id="place-form"></div>
+    <button class="row danger" data-act="del-place">Удалить адрес</button>
+  </section>
+
+  <!-- ───────────────────────── NOTES ───────────────────────── -->
+  <section id="v-notes" class="view" hidden>
+    <p class="hint">Вставьте текст заметки. Строки вида<br>
+      <code>Пн 16:00-17:30 Аня бассейн, Тверская улица 10</code></p>
+    <textarea id="note-text" rows="12" spellcheck="false"></textarea>
+    <button class="row add" data-act="parse">Разобрать</button>
+    <div id="parse-out"></div>
+    <div class="cap sec">Автосинхронизация</div>
+    <p class="hint">iCloud не отдаёт заметку без входа в Apple ID.
+      Укажите URL, который отдаёт текст заметки (Shortcut / прокси) — приложение будет опрашивать его.</p>
+    <div id="sync-cfg" class="list"></div>
+  </section>
+
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/travel.js"></script>
+<script src="js/planner.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

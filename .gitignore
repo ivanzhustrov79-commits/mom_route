@@ -1,0 +1,5 @@
+# Личные данные семьи — в публичный репозиторий не уходят.
+# Расписание живёт только на устройствах, в localStorage.
+schedule.json
+tools/build_schedule.js
+NOTES.local.md
