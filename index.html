@@ -27,6 +27,8 @@
       <div id="hero-label" class="cap"></div>
       <div id="hero-num"><span id="cd">—</span><i id="cd-u"></i></div>
       <div id="hero-sub"></div>
+      <div class="grow"></div>
+      <div id="hero-more"></div>
     </div>
     <div id="warn" hidden></div>
     <div id="offer" hidden></div>
@@ -49,6 +51,15 @@
   <!-- ───────────────────────── WEEK ───────────────────────── -->
   <section id="v-week" class="view" hidden>
     <div id="week"></div>
+    <div class="cap sec">Дети</div>
+    <div id="kid-strip" class="list"></div>
+    <button class="row add" data-act="add-kid">+ ребёнок</button>
+  </section>
+
+  <!-- ───────────────────────── CLASS ───────────────────────── -->
+  <section id="v-cls" class="view" hidden>
+    <div id="cls-form"></div>
+    <button class="row danger" data-act="del-cls">Удалить занятие</button>
   </section>
 
   <!-- ───────────────────────── ASSUMPTIONS ───────────────────────── -->
@@ -61,10 +72,6 @@
 
   <!-- ───────────────────────── SETTINGS ───────────────────────── -->
   <section id="v-settings" class="view" hidden>
-    <div class="cap sec">Дети</div>
-    <div id="kid-list" class="list"></div>
-    <button class="row add" data-act="add-kid">+ ребёнок</button>
-
     <div class="cap sec">Адреса</div>
     <div id="place-list" class="list"></div>
     <button class="row add" data-act="add-place">+ адрес</button>
@@ -95,17 +102,8 @@
 
   <!-- ───────────────────────── KID ───────────────────────── -->
   <section id="v-kid" class="view" hidden>
-    <div id="kid-head"></div>
-    <div class="cap sec">Занятия</div>
-    <div id="act-list" class="list"></div>
-    <button class="row add" data-act="add-activity">+ занятие</button>
+    <div id="kid-form"></div>
     <button class="row danger" data-act="del-kid">Удалить ребёнка</button>
-  </section>
-
-  <!-- ───────────────────────── ACTIVITY ───────────────────────── -->
-  <section id="v-act" class="view" hidden>
-    <div id="act-form"></div>
-    <button class="row danger" data-act="del-activity">Удалить занятие</button>
   </section>
 
   <!-- ───────────────────────── PLACE ───────────────────────── -->

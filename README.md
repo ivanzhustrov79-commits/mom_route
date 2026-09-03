@@ -12,17 +12,34 @@ browser and all data stays in `localStorage` on the device.
 
 ## Screens
 
-`Сегодня` is all the driver needs — a countdown to the next departure and
-today's outings. The calendar icon opens `Неделя`, seven days from today. The
-settings icon lives *inside* the week view, one level deeper, so the day-to-day
-screen carries no knobs at all.
+**`Сегодня`** opens on one thing only: the countdown to the next departure and
+that outing written out in full — every stop, who is dropped or collected, and
+the time everyone is home again. It fills the screen; the rest of the day is one
+scroll below. The teacher's name appears here and nowhere else, because it is
+only worth knowing for the event you are about to drive to.
 
-## Setting it up
+Below the fold the day runs as a single strip, in time order:
 
-`Настройки → Дети → ребёнок → занятие`: place, weekdays, start and end, whether
-a drop-off and/or pick-up is needed, how early to be there, the pick-up window
-(`не раньше` / `не позже`), how long the pick-up itself takes, and whether the
-child may be met on foot. Addresses are geocoded through OpenStreetMap.
+* **outings** — a walking or car glyph, departure from home, each stop, back home;
+* **free windows** in green — how long, until when, and where you are. Tapping one
+  switches between waiting at home and waiting at the next place; if that would
+  leave a child sitting in the car past the limit, the app says so and puts it
+  back rather than silently doing nothing;
+* **children getting home on their own**, in amber with a warning glyph. Tapping
+  turns it into a pick-up for that day, and one line at the foot of the day undoes
+  it. The check is per child: if nobody in the plan collects them from their last
+  class of the day, it says so.
+
+**`Календарь`** (calendar icon) is the timetable — seven days of classes, no
+driving. Overlapping classes step to the right so a clash is visible instead of
+reading as one-after-another. Tap a class to edit its name, teacher, place, days,
+times, who attends and how the drop-off and pick-up work; every class is weekly.
+`+ занятие` adds one to that day, and children live at the bottom of this screen.
+A class shared by several children is one row and edits reach all of them.
+
+**`Настройки`** (from inside the calendar, one level deeper) is technical only —
+addresses, planner limits, routing source, notifications, data. Nothing the
+driver needs day to day.
 
 There is also a rough parser for schedules pasted as text
 (`Настройки → Импорт расписания`), and JSON import/export for moving a finished

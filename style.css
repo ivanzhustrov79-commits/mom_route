@@ -1,10 +1,10 @@
 :root{
   --bg:#fff; --ink:#0b0b0b; --mut:#9a9a9a; --line:#ececec;
-  --hot:#d0021b; --ok:#0b0b0b; --field:#fafafa;
+  --hot:#d0021b; --free:#2f9e5b; --warn:#b8811a; --field:#fafafa;
 }
 @media (prefers-color-scheme:dark){
   :root{ --bg:#0a0a0a; --ink:#f2f2f2; --mut:#6e6e6e; --line:#1e1e1e;
-         --hot:#ff453a; --field:#141414; }
+         --hot:#ff453a; --free:#4cc47a; --warn:#e0a63a; --field:#141414; }
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -30,7 +30,13 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .foot{margin:40px 0 24px;font-size:11px;color:var(--mut);text-align:center}
 
 /* hero */
-#hero{padding:34px 0 30px}
+#hero{padding:34px 0 26px;min-height:calc(100vh - 104px);
+      min-height:calc(100dvh - 104px);display:flex;flex-direction:column}
+#hero .grow{flex:1;min-height:26px}
+#hero-more{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+#hero-sub .legs .leg span{font-size:17px}
+#hero-sub .legs .leg b{font-size:15px}
+#trips-cap{margin:0 0 4px}
 #hero-label{margin-bottom:14px}
 #hero-num{font-size:clamp(72px,26vw,118px);font-weight:200;letter-spacing:-.055em;line-height:.86}
 #hero-num i{font-style:normal;font-size:.2em;font-weight:400;letter-spacing:.14em;
@@ -54,7 +60,17 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .wd{margin:34px 0 2px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
 .wd.today{color:var(--ink)}
 .wd:first-child{margin-top:8px}
-.cls{display:flex;gap:14px;padding:13px 0;border-top:1px solid var(--line)}
+.cls{display:flex;gap:14px;width:100%;text-align:left;background:none;border:0;
+     color:var(--ink);font:inherit;cursor:pointer;
+     padding:13px 0;border-top:1px solid var(--line);
+     margin-left:calc(var(--col, 0) * 18px);
+     width:calc(100% - var(--col, 0) * 18px)}
+.cls:active{opacity:.5}
+.wadd{display:block;background:none;border:0;color:var(--mut);font:inherit;font-size:12px;
+      padding:12px 2px 2px;cursor:pointer;border-top:1px solid var(--line);width:100%;text-align:left}
+.wadd:active{opacity:.5}
+.cls.over{border-top-color:transparent;padding-left:12px;
+          border-left:1px solid var(--line);position:relative}
 .cls b{width:46px;flex:none;font-weight:400;font-size:13px;line-height:1.45;color:var(--mut)}
 .cls span{font-size:15px}
 .cls i{display:block;font-style:normal;font-size:12px;color:var(--mut);margin-top:3px;line-height:1.45}
@@ -90,7 +106,26 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #offer .qb button:active{opacity:.5}
 
 /* trips — маршрут «из дома … и домой» */
-.trip{padding:18px 0 16px;border-top:1px solid var(--line)}
+.trip{display:block;width:100%;text-align:left;background:none;border:0;
+      color:var(--ink);font:inherit;
+      padding:18px 0 16px;border-top:1px solid var(--line)}
+button.trip{cursor:pointer}
+button.trip:active{opacity:.55}
+
+/* свободное окно и «дойдут сами» — карточки того же размера, но с цветной гранью */
+.trip.spare{border-top-color:var(--free);padding-left:12px;
+            box-shadow:inset 2px 0 0 var(--free)}
+.trip.spare .lbl{color:var(--free)}
+.trip.alone{border-top-color:var(--warn);padding-left:12px;
+            box-shadow:inset 2px 0 0 var(--warn)}
+.trip.alone .ic{color:var(--warn);opacity:1}
+.trip.alone .lbl{color:var(--warn)}
+.trip.spare .leg b,.trip.alone .leg b{width:46px}
+
+.flash{font-size:12px;line-height:1.5;color:var(--warn);padding:16px 2px 0}
+.undo{display:block;width:100%;text-align:left;background:none;border:0;color:var(--mut);
+      font:inherit;font-size:12px;padding:16px 2px 0;cursor:pointer}
+.undo:active{opacity:.5}
 .trip.done{opacity:.34}
 .th{display:flex;align-items:center;gap:10px}
 .th .t{font-size:21px;font-weight:400;letter-spacing:-.01em}

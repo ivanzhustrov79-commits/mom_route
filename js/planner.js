@@ -3,6 +3,12 @@
    The optimiser therefore merges errands into one outing whenever the time
    windows allow it, which is exactly "as few trips as possible".          */
 
+/* Решения мамы на конкретный день, влияющие на план:
+   FORCE_PICK — «этих забираю сама», даже если по расписанию они сами;
+   WAIT_OK    — «подожду на месте», не возвращаясь домой между заездами. */
+let FORCE_PICK = new Set(), WAIT_OK = new Set();
+const gapKey = (a, b) => `${a}>${b}`;
+
 /* 1 ── turn the weekly settings into concrete stops for one date ─────── */
 function buildStops(date) {
   const dow = date.getDay(), out = [];
@@ -18,15 +24,18 @@ function buildStops(date) {
     const freeFrom = prev.length ? Math.max(...prev) + 10 : -Infinity;
     if (a.drop && a.drop.on) {
       const by = a.start - (a.drop.leadMin || 0);
-      out.push({ kind:'drop', placeId:a.placeId, kidIds:[k.id], title:a.title,
+      out.push({ kind:'drop', placeId:a.placeId, kidIds:[k.id], title:a.title, teacher:a.teacher,
                  w0: Math.min(by, Math.max(by - 30, freeFrom)), w1: by,
                  service:a.drop.leadMin || 0,
                  must:true, modes:a.drop.modes || ['car'] });
     }
-    if (a.pick && a.pick.on) {
-      out.push({ kind:'pick', placeId:a.placeId, kidIds:[k.id], title:a.title,
-                 w0:a.pick.earliest, w1:a.pick.latest, service:a.pick.serviceMin || 0,
-                 must:!!a.pick.must, modes:a.pick.modes || ['car'] });
+    const forced = FORCE_PICK.has(a.id);          // «сегодня забираю сама»
+    if (a.pick && (a.pick.on || forced)) {
+      out.push({ kind:'pick', placeId:a.placeId, kidIds:[k.id], title:a.title, teacher:a.teacher,
+                 w0: a.pick.on ? a.pick.earliest : a.end,
+                 w1: a.pick.on ? a.pick.latest   : a.end + 20,
+                 service:a.pick.serviceMin || 5,
+                 must: !!a.pick.must || forced, modes:a.pick.modes || ['car'] });
     }
     }
   }
@@ -42,6 +51,8 @@ function buildStops(date) {
       m.must = m.must || s.must;
       m.modes = m.modes.filter(x => s.modes.includes(x));
       if (m.title !== s.title) m.title = m.title + ' / ' + s.title;
+      if (s.teacher && m.teacher !== s.teacher)
+        m.teacher = [m.teacher, s.teacher].filter(Boolean).join(', ');
     } else merged.push({ ...s, kidIds:[...s.kidIds] });
   }
   merged.sort((a, b) => (a.w0 - b.w0) || (a.w1 - b.w1));
@@ -90,7 +101,8 @@ function outing(stops, i, j, dow) {
   for (let x = 0; x < n - 1; x++) {
     const leg = hop(x, a[x] + seg[x].service);
     inner += leg;
-    if (a[x + 1] - a[x] - seg[x].service - leg > S.cfg.maxWait) return null;
+    if (a[x + 1] - a[x] - seg[x].service - leg > S.cfg.maxWait &&
+        !WAIT_OK.has(gapKey(seg[x].placeId, seg[x + 1].placeId))) return null;
   }
 
   /* нельзя завезти ребёнка на кружок раньше, чем забрал его с прошлого места */
@@ -187,7 +199,10 @@ function maybeWalk(t) {
 /* 5 ── the plan for one date ─────────────────────────────────────────── */
 function planDay(date = new Date(), opts = {}) {
   RIDE_CAP = opts.maxRide == null ? null : opts.maxRide;
-  try { return planDayInner(date); } finally { RIDE_CAP = null; }
+  FORCE_PICK = opts.force || new Set();
+  WAIT_OK = opts.waitOk || new Set();
+  try { return planDayInner(date); }
+  finally { RIDE_CAP = null; FORCE_PICK = new Set(); WAIT_OK = new Set(); }
 }
 
 function planDayInner(date) {
@@ -241,6 +256,53 @@ function dayConflicts(date = new Date()) {
     }
   }
   return out;
+}
+
+/* 8 ── кого план оставляет добираться самостоятельно ────────────────
+   Смотрим последнее занятие ребёнка за день: если из этого места его
+   никто не забирает, домой он идёт сам. Это всегда решение мамы.     */
+function unattended(p, date = new Date()) {
+  const dow = date.getDay(), dk = dayKey(date), rows = [];
+  const collected = new Set();
+  for (const t of p.trips) for (const s of t.stops)
+    if (s.kind === 'pick') for (const id of s.kidIds) collected.add(id + '|' + s.placeId);
+
+  for (const k of S.kids) {
+    const today = k.activities
+      .filter(a => a.days.includes(dow) && !(a.from && dk < a.from) && !(a.until && dk > a.until))
+      .sort((x, y) => x.start - y.start);
+    const last = today[today.length - 1];
+    if (!last || place(last.placeId)?.home) continue;
+    if (collected.has(k.id + '|' + last.placeId)) continue;
+    const key = last.placeId + '|' + last.end;
+    const m = rows.find(r => r.key === key);
+    if (m) { m.kids.push(k); m.actIds.push(last.id); }
+    else rows.push({ key, placeId:last.placeId, at:last.end, title:last.title,
+                     kids:[k], actIds:[last.id] });
+  }
+  return rows.sort((a, b) => a.at - b.at);
+}
+
+/* 7 ── свободные окна: где мама и сколько времени ────────────────────
+   Внутри выезда это ожидание на месте, между выездами — время дома.   */
+function spareBlocks(p, date = new Date(), minMin = 20) {
+  const dow = date.getDay(), home = homePlace().id, out = [];
+  for (let i = 0; i < p.trips.length; i++) {
+    const t = p.trips[i];
+    for (let x = 0; x < t.stops.length - 1; x++) {
+      const a = t.stops[x], b = t.stops[x + 1];
+      const leave = a.arrive + a.service;
+      const idle = b.arrive - leave - drive(a.placeId, b.placeId, leave, dow);
+      if (idle >= minMin)
+        out.push({ from: leave, to: leave + idle, placeId: a.placeId,
+                   key: gapKey(a.placeId, b.placeId), away: true });
+    }
+    const nx = p.trips[i + 1];
+    if (nx && nx.depart - t.home >= minMin)
+      out.push({ from: t.home, to: nx.depart, placeId: home, away: false,
+                 key: gapKey(t.stops[t.stops.length - 1].placeId, nx.stops[0].placeId) });
+  }
+  return out.sort((a, b) => a.from - b.from);
 }
 
 /* the next outing that hasn't departed yet */

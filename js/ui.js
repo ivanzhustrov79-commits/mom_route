@@ -4,6 +4,9 @@ const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 let stack = [{ v:'now' }], PLAN = null, planDK = null;
+let WEEKROWS = [];                 // строки календаря текущего рендера
+let FLASH = '';                    // короткое пояснение к последнему действию
+let EDITING = { refs: [] };        // какие занятия правит открытый редактор
 
 /* ── field binding ─────────────────────────────────────────────────── */
 let BIND = {}, bn = 0;
@@ -28,16 +31,18 @@ const cur = () => stack[stack.length - 1];
 function go(v, p) { stack.push({ v, p }); render(); }
 function back() { if (stack.length > 1) stack.pop(); render(); }
 
-const TITLES = { now:'', vault:'Код', week:'Неделя', assume:'Допущения', settings:'Настройки',
-                 kid:'Ребёнок', act:'Занятие', place:'Адрес', notes:'Расписание из заметки' };
+const TITLES = { now:'', vault:'Код', week:'Календарь', cls:'Занятие', kid:'Ребёнок',
+                 assume:'Допущения', settings:'Настройки', place:'Адрес',
+                 notes:'Расписание из заметки' };
 
-const SVG = (d, extra = '') => `<svg viewBox="0 0 20 20" width="19" height="19" fill="none"
-  stroke="currentColor" stroke-width="1.4" stroke-linecap="round">${d}${extra}</svg>`;
+const SVG = (d) => `<svg viewBox="0 0 20 20" width="19" height="19" fill="none"
+  stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICON = {
   cal:  SVG('<rect x="2.7" y="4.2" width="14.6" height="13.1" rx="1.6"/><path d="M2.7 8.2h14.6M6.8 2.6v3.2M13.2 2.6v3.2"/>'),
   cfg:  SVG('<path d="M3 6.7h14M3 13.3h14"/><circle cx="7.6" cy="6.7" r="2.1" fill="var(--bg)"/><circle cx="12.6" cy="13.3" r="2.1" fill="var(--bg)"/>'),
   walk: SVG('<circle cx="10.2" cy="3.4" r="1.7"/><path d="M10.2 6v5.2M10.2 11.2L7.4 17M10.2 11.2L13 17M7.1 8.1l6.2-1.1"/>'),
-  car:  SVG('<path d="M3.4 13.6v-2.3l1.8-3.5a1.5 1.5 0 011.3-.8h7a1.5 1.5 0 011.3.8l1.8 3.5v2.3"/><path d="M3.4 11.3h13.2"/><circle cx="6.6" cy="13.6" r="1.5"/><circle cx="13.4" cy="13.6" r="1.5"/>')
+  car:  SVG('<path d="M3.4 13.6v-2.3l1.8-3.5a1.5 1.5 0 011.3-.8h7a1.5 1.5 0 011.3.8l1.8 3.5v2.3"/><path d="M3.4 11.3h13.2"/><circle cx="6.6" cy="13.6" r="1.5"/><circle cx="13.4" cy="13.6" r="1.5"/>'),
+  warn: SVG('<path d="M10 3.4 2.8 16.2h14.4L10 3.4z"/><path d="M10 8v3.6M10 13.9v.1"/>')
 };
 
 function render() {
@@ -50,49 +55,38 @@ function render() {
   nav.hidden = !(t.v === 'now' || t.v === 'week');
   nav.innerHTML = t.v === 'now' ? ICON.cal : t.v === 'week' ? ICON.cfg : '';
   $('#crumb').textContent = t.v === 'now' ? dateLine() : TITLES[t.v] || '';
-  ({ now:renderNow, vault:renderVault, week:renderWeek, assume:renderAssume,
-     settings:renderSettings, kid:renderKid, act:renderAct, place:renderPlace,
+  ({ now:renderNow, vault:renderVault, week:renderWeek, cls:renderCls, kid:renderKid,
+     assume:renderAssume, settings:renderSettings, place:renderPlace,
      notes:renderNotes })[t.v](t.p);
-}
-
-/* Пн Вт Ср Чт Пт → «Пн–Пт»,  Пн Чт → «Пн Чт» */
-function daysLabel(days) {
-  if (!days.length) return '—';
-  const d = [...days].sort((a, b) => (a || 7) - (b || 7));
-  const run = d.every((x, i) => i === 0 || x === d[i - 1] + 1);
-  return run && d.length > 2 ? DOW[d[0]] + '–' + DOW[d[d.length - 1]]
-                             : d.map(x => DOW[x]).join(' ');
-}
-
-/* one-line summary of what an activity asks of mom */
-function actLine(a) {
-  const p = place(a.placeId)?.name || '?';
-  const bits = [];
-  if (a.drop?.on) bits.push('отвезти к ' + m2hm(a.start - (a.drop.leadMin || 0)));
-  if (a.pick?.on) bits.push('забрать ' + m2hm(a.pick.earliest) + '–' + m2hm(a.pick.latest) +
-                            (a.pick.must ? '' : ', могут сами') +
-                            (a.pick.modes.includes('walk') ? ', можно пешком' : ''));
-  if (!bits.length) bits.push('без развоза');
-  return `${daysLabel(a.days)} · ${m2hm(a.start)}–${m2hm(a.end)} · ${p}<br>${bits.join(' · ')}`;
 }
 
 const dateLine = () => { const d = new Date();
   return `${DOW[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]}`; };
-
-/* ── plan cache ────────────────────────────────────────────────────── */
 const dur = m => { m = Math.round(m);
   return m < 60 ? m + ' мин' : (m / 60 | 0) + ' ч ' + String(m % 60).padStart(2, '0') + ' м'; };
+
+/* имя ребёнка всегда со своей картинкой */
+const kidLabel = k => `${k.icon ? k.icon + ' ' : ''}${esc(k.name)}`;
+const namesOf = ids => ids.map(i => { const k = kid(i); return k ? kidLabel(k) : ''; })
+                          .filter(Boolean).join(', ');
+
+/* ── план на сегодня ───────────────────────────────────────────────── */
+function dayOverrides() {
+  const dk = dayKey();
+  return { force:  new Set((S.cache.pickUp  || {})[dk] || []),
+           waitOk: new Set((S.cache.stayOut || {})[dk] || []) };
+}
 
 /* Долгая поездка с мамой — это не запрет, а вопрос. Считаем день дважды:
    строго по настройке и без потолка. Если без потолка выездов меньше —
    предлагаем маме выбрать; ответ помним на этот день.                    */
 function buildPlan() {
-  const d = new Date(), dk = dayKey(d);
+  const d = new Date(), dk = dayKey(d), o = dayOverrides();
   const said = (S.cache.rideOk || {})[dk];
-  const strict = planDay(d);
+  const strict = planDay(d, o);
   if (said === false) return strict;
 
-  const loose = planDay(d, { maxRide: 24 * 60 });
+  const loose = planDay(d, { ...o, maxRide: 24 * 60 });
   const worst = loose.trips.reduce((a, b) => (b.ride > (a ? a.ride : -1) ? b : a), null);
   const long = worst && worst.ride > S.cfg.maxRide;
 
@@ -110,21 +104,54 @@ function plan(force) {
 }
 const invalidate = () => { PLAN = null; };
 
-/* ── NOW ───────────────────────────────────────────────────────────── */
-const kidsOf = t => t.kidIds.map(k => kid(k)?.name).filter(Boolean).join(', ');
-const destOf = t => t.stops.map(s => place(s.placeId)?.name || '?').join(' → ');
+/* ── карточки дня ──────────────────────────────────────────────────── */
 /* Выезд показываем как маршрут: из дома → остановки с действием → домой.
-   Без этого непонятно, откуда машина взялась и куда потом делись дети. */
-const namesOf = ids => ids.map(i => kid(i)?.name).filter(Boolean).join(', ');
-
-function legsHtml(t) {
+   Педагога называем только у ближайшего события, чтобы не шуметь.      */
+function legsHtml(t, teach) {
   const rows = t.stops.map(s =>
     `<div class="leg"><b>${m2hm(s.arrive)}</b><div>
        <span>${esc(place(s.placeId)?.name || '?')}</span>
-       <i>${s.kind === 'drop' ? 'отвезти' : 'забрать'}: ${esc(namesOf(s.kidIds))}</i>
+       <i>${s.kind === 'drop' ? 'отвезти' : 'забрать'}: ${namesOf(s.kidIds)}${
+         teach && s.teacher ? ' · ' + esc(s.teacher) : ''}</i>
      </div></div>`);
   rows.push(`<div class="leg home"><b>${m2hm(t.home)}</b><div><span>дом</span></div></div>`);
   return rows.join('');
+}
+
+function tripRow(x, now) {
+  const extra = (x.mode === 'walk' ? '' : `${Math.round(x.driveMin)} мин за рулём`) +
+    (x.ride > S.cfg.maxRide && x.rideKid
+      ? ` · ${kidLabel(kid(x.rideKid) || {name:''})} в машине ${dur(x.ride)}` : '');
+  return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
+      <div class="th">
+        <span class="t">${m2hm(x.depart)}</span>
+        <span class="ic">${x.mode === 'walk' ? ICON.walk : ICON.car}</span>
+        <span class="lbl">из дома${extra ? ' · ' + extra : ''}</span>
+      </div>
+      ${legsHtml(x)}
+    </div>`;
+}
+
+/* свободное окно: где мама и до какого часа. Нажатие меняет место. */
+function spareCard(g) {
+  return `<button class="trip spare" data-act="stay" data-key="${esc(g.key)}">
+      <div class="th"><span class="t">${m2hm(g.from)}</span>
+        <span class="lbl">свободно ${dur(g.to - g.from)} · до ${m2hm(g.to)}</span></div>
+      <div class="leg"><b></b><div><span>${esc(place(g.placeId)?.name || '')}</span>
+        <i>${g.away ? 'ждём на месте — нажмите, чтобы вернуться домой'
+                    : 'дома — нажмите, чтобы ждать у следующего места'}</i></div></div>
+    </button>`;
+}
+
+/* ребёнок добирается домой сам — это всегда решение, а не мелочь */
+function aloneCard(r) {
+  return `<button class="trip alone" data-act="pick-self" data-key="${esc(r.actIds.join(','))}">
+      <div class="th"><span class="t">${m2hm(r.at)}</span>
+        <span class="ic">${ICON.warn}</span>
+        <span class="lbl">${esc(place(r.placeId)?.name || '')} — домой сами</span></div>
+      <div class="leg"><b></b><div><span>${r.kids.map(kidLabel).join(', ')}</span>
+        <i>после «${esc(r.title)}» · нажмите — заберу сама</i></div></div>
+    </button>`;
 }
 
 function renderNow() {
@@ -152,8 +179,11 @@ function renderNow() {
       `<div class="hlead"><span class="ic">${nx.mode === 'walk' ? ICON.walk : ICON.car}</span>` +
       `<span>${nx.mode === 'walk' ? 'выход' : 'выезд'} из дома в ${m2hm(nx.depart)}` +
       (nx.mode === 'walk' ? '' : ` · ${Math.round(nx.driveMin)} мин за рулём`) + `</span></div>` +
-      `<div class="legs">${legsHtml(nx)}</div>`;
+      `<div class="legs">${legsHtml(nx, true)}</div>`;
   }
+
+  const rest = p.trips.filter(x => x !== nx).length + unattended(p, new Date()).length;
+  $('#hero-more').textContent = rest ? 'дальше сегодня ↓' : '';
 
   const cf = dayConflicts(new Date());
   const wn = $('#warn');
@@ -171,18 +201,22 @@ function renderNow() {
     off.innerHTML =
       `<div class="q">Можно обойтись <b>на ${o.saved} ${
         o.saved === 1 ? 'выезд' : o.saved < 5 ? 'выезда' : 'выездов'} меньше</b>, ` +
-      `если ${esc(o.kid ? o.kid.name : 'ребёнок')} поедет кататься с мамой — ${dur(o.ride)} в машине.</div>` +
+      `если ${o.kid ? kidLabel(o.kid) : 'ребёнок'} поедет кататься с мамой — ${dur(o.ride)} в машине.</div>` +
       `<div class="qb"><button data-act="ride-yes">Да, поедет</button>` +
       `<button data-act="ride-no">Нет, домой</button></div>`;
   }
 
-  $('#trips').innerHTML = p.trips.map(x => tripRow(x, t)).join('')
-    + p.skipped.map(s => `
-    <div class="trip done">
-      <div class="th"><span class="t">${m2hm(s.w0)}</span>
-        <span class="lbl">${esc(place(s.placeId)?.name || '')} — дойдут сами,
-          отдельный выезд не окупается</span></div>
-    </div>`).join('');
+  /* весь день одной лентой: выезды, свободные окна, «дойдут сами» */
+  const items = [];
+  for (const x of p.trips)  items.push({ at: x.depart, html: tripRow(x, t) });
+  for (const r of unattended(p, new Date())) items.push({ at: r.at, html: aloneCard(r) });
+  for (const g of spareBlocks(p, new Date())) items.push({ at: g.from, html: spareCard(g) });
+  items.sort((a, b) => a.at - b.at);
+
+  const forced = ((S.cache.pickUp || {})[dayKey()] || []).length;
+  $('#trips').innerHTML = items.map(i => i.html).join('') +
+    (FLASH ? `<div class="flash">${esc(FLASH)}</div>` : '') +
+    (forced ? `<button class="undo" data-act="pick-reset">забираю сама: ${forced} — вернуть как было</button>` : '');
 
   const st = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
                estimate:'оценка по прямой', loading:'считаю маршруты…', idle:'' }[matStatus] || '';
@@ -205,23 +239,7 @@ function renderVault() {
   setTimeout(() => $('#vault-code').focus(), 60);
 }
 
-/* ── WEEK ──────────────────────────────────────────────────────────── */
-function tripRow(x, now) {
-  const extra = (x.mode === 'walk' ? '' : `${Math.round(x.driveMin)} мин за рулём`) +
-    (x.ride > S.cfg.maxRide && x.rideKid
-      ? ` · ${esc(kid(x.rideKid)?.name || '')} в машине ${dur(x.ride)}` : '');
-  return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
-      <div class="th">
-        <span class="t">${m2hm(x.depart)}</span>
-        <span class="ic">${x.mode === 'walk' ? ICON.walk : ICON.car}</span>
-        <span class="lbl">из дома${extra ? ' · ' + extra : ''}</span>
-      </div>
-      ${legsHtml(x)}
-    </div>`;
-}
-
-/* Календарь — только расписание занятий, без развоза.
-   Одно и то же занятие у нескольких детей — одна строка.               */
+/* ── КАЛЕНДАРЬ — только занятия, без развоза ───────────────────────── */
 function classesOn(date) {
   const dow = date.getDay(), dk = dayKey(date), rows = [];
   for (const k of S.kids) for (const a of k.activities) {
@@ -230,15 +248,25 @@ function classesOn(date) {
     if (a.until && dk > a.until) continue;
     const key = a.title + '|' + a.placeId + '|' + a.start + '|' + a.end;
     const m = rows.find(r => r.key === key);
-    if (m) m.kids.push(k.name);
-    else rows.push({ key, title: a.title, placeId: a.placeId,
-                     start: a.start, end: a.end, kids: [k.name] });
+    if (m) { m.kids.push(k); m.refs.push(a.id); }
+    else rows.push({ key, title:a.title, teacher:a.teacher, placeId:a.placeId,
+                     start:a.start, end:a.end, kids:[k], refs:[a.id] });
   }
-  return rows.sort((x, y) => (x.start - y.start) || (x.end - y.end));
+  rows.sort((x, y) => (x.start - y.start) || (x.end - y.end));
+  /* раскладка по колонкам: занятие уходит вправо, если идёт поверх другого */
+  const busy = [];
+  for (const r of rows) {
+    let col = busy.findIndex(end => end <= r.start);
+    if (col < 0) { col = busy.length; busy.push(0); }
+    busy[col] = r.end;
+    r.col = Math.min(col, 3);
+  }
+  return rows;
 }
 
 function renderWeek() {
   const t0 = new Date(), out = [];
+  WEEKROWS = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i);
     out.push(`<div class="wd ${i === 0 ? 'today' : ''}">${
@@ -248,20 +276,98 @@ function renderWeek() {
         «${esc(c.to.title)}» с ${m2hm(c.to.start)}, дорога ${Math.round(c.road)} мин —
         не хватает ${Math.round(c.short)} мин</div>`);
     const rows = classesOn(d);
-    out.push(rows.length
-      ? rows.map(c => `<div class="cls">
+    out.push(rows.map(c => {
+      const idx = WEEKROWS.push(c) - 1;
+      return `<button class="cls${c.col ? ' over' : ''}" style="--col:${c.col}"
+                data-act="edit-cls" data-idx="${idx}">
           <b>${m2hm(c.start)}<br>${m2hm(c.end)}</b>
           <div><span>${esc(c.title)}</span>
-            <i>${esc(c.kids.join(', '))}${
+            <i>${c.kids.map(kidLabel).join(', ')}${
               (place(c.placeId)?.name || '') === c.title ? ''
                 : ' · ' + esc(place(c.placeId)?.name || '?')}</i></div>
-        </div>`).join('')
-      : '<div class="wempty">занятий нет</div>');
+        </button>`;
+    }).join('') || '<div class="wempty">занятий нет</div>');
+    out.push(`<button class="wadd" data-act="add-cls" data-dow="${d.getDay()}">+ занятие</button>`);
   }
   $('#week').innerHTML = out.join('');
+  $('#kid-strip').innerHTML = S.kids.map(k =>
+    `<button class="row" data-go="kid" data-id="${k.id}">${kidLabel(k)}<i>${
+      k.activities.length} зан.</i></button>`).join('');
 }
 
-/* ── ASSUMPTIONS ───────────────────────────────────────────────────── */
+/* ── РЕДАКТОР ЗАНЯТИЯ ──────────────────────────────────────────────── */
+const editRefs = () => EDITING.refs.filter(id => findAct(id)[1]);
+const setAll = fn => { for (const id of editRefs()) { const [, a] = findAct(id); fn(a); } };
+
+function toggleKidOnClass(kidId, on) {
+  const [, master] = findAct(editRefs()[0]) || [];
+  const k = kid(kidId); if (!k || !master) return;
+  if (on) {
+    const copy = { ...structuredClone(master), id: uid('a_') };
+    delete copy.note;
+    k.activities.push(copy);
+    EDITING.refs = [...editRefs(), copy.id];
+  } else {
+    const mine = k.activities.filter(a => EDITING.refs.includes(a.id)).map(a => a.id);
+    k.activities = k.activities.filter(a => !mine.includes(a.id));
+    EDITING.refs = editRefs().filter(id => !mine.includes(id));
+  }
+  save(); invalidate();
+  if (!editRefs().length) return back();
+  render();
+}
+
+function renderCls() {
+  const refs = editRefs();
+  if (!refs.length) return back();
+  const [, a] = findAct(refs[0]);
+  const opts = S.places.map(p => [p.id, p.name]);
+
+  $('#cls-form').innerHTML =
+    fWide('Название', a.title, v => setAll(x => x.title = v)) +
+    fWide('Педагог', a.teacher || '', v => setAll(x => x.teacher = v)) +
+    fSel('Место', a.placeId, opts, v => setAll(x => x.placeId = v)) +
+    `<button class="row add" data-act="add-place-here">+ новый адрес</button>` +
+    `<div class="days">${DOW.map((d, i) =>
+       `<button data-day="${i}" class="${a.days.includes(i) ? 'on' : ''}">${d}</button>`).join('')}</div>` +
+    fTime('Начало', a.start, v => setAll(x => x.start = v)) +
+    fTime('Конец', a.end, v => setAll(x => { x.end = v; if (x.pick.earliest < v) x.pick.earliest = v; })) +
+
+    `<div class="grp"><div class="cap">Кто ходит</div>` +
+      S.kids.map(k => fChk((k.icon ? k.icon + ' ' : '') + k.name,
+        k.activities.some(x => refs.includes(x.id)),
+        v => toggleKidOnClass(k.id, v))).join('') +
+    `</div>` +
+
+    `<div class="grp"><div class="cap">Отвезти</div>` +
+      fChk('Нужен отвоз', a.drop.on, v => { setAll(x => x.drop.on = v); render(); }) +
+      (a.drop.on ? fNum('Быть на месте за, мин', a.drop.leadMin,
+                        v => setAll(x => x.drop.leadMin = v), 0, 60) : '') +
+    `</div>` +
+
+    `<div class="grp"><div class="cap">Забрать</div>` +
+      fChk('Нужен забор', a.pick.on, v => { setAll(x => x.pick.on = v); render(); }) +
+      (a.pick.on
+        ? fChk('Обязательно (сами не дойдут)', a.pick.must, v => setAll(x => x.pick.must = v)) +
+          fTime('Не раньше', a.pick.earliest, v => setAll(x => x.pick.earliest = v)) +
+          fTime('Не позже',  a.pick.latest,   v => setAll(x => x.pick.latest = v)) +
+          fNum('На забор, мин', a.pick.serviceMin, v => setAll(x => x.pick.serviceMin = v), 0, 40) +
+          fChk('Можно пешком', a.pick.modes.includes('walk'),
+               v => setAll(x => x.pick.modes = v ? ['car', 'walk'] : ['car']))
+        : '') +
+    `</div>`;
+}
+
+/* ── РЕБЁНОК ───────────────────────────────────────────────────────── */
+function renderKid(id) {
+  const k = kid(id); if (!k) return back();
+  $('#kid-form').innerHTML =
+    fWide('Имя', k.name, v => { k.name = v; }) +
+    fWide('Картинка (эмодзи)', k.icon || '', v => { k.icon = v.trim().slice(0, 4); }) +
+    `<div class="hint">${k.icon || '—'} ${esc(k.name)}</div>`;
+}
+
+/* ── ДОПУЩЕНИЯ ─────────────────────────────────────────────────────── */
 function assumptions() {
   const done = S.cache.okNotes || [];
   const out = [];
@@ -271,9 +377,9 @@ function assumptions() {
                  text: a.note.replace(/^ЗАМЕТКА:\s*/, '') });
   for (const p of S.places) {
     if (done.includes('place:' + p.id)) continue;
-    if (!p.address)                                     // адрес вообще не заведён
+    if (!p.address)
       out.push({ id: 'place:' + p.id, who: p.name, text: 'адрес не задан' });
-    else if (p.approx)                                  // адрес есть, но дом не нашёлся
+    else if (p.approx)
       out.push({ id: 'place:' + p.id, who: p.name,
                  text: 'точка на карте приблизительная — ' + p.address });
   }
@@ -288,15 +394,8 @@ function renderAssume() {
     : '<div class="wempty">всё проверено</div>';
 }
 
-/* ── SETTINGS ──────────────────────────────────────────────────────── */
+/* ── НАСТРОЙКИ — только техника ────────────────────────────────────── */
 function renderSettings() {
-  $('#kid-list').innerHTML = S.kids.map(k => {
-    const sum = k.activities.length
-      ? k.activities.map(a => `${esc(a.title)} · ${daysLabel(a.days)} ${m2hm(a.start)}–${m2hm(a.end)}`).join('<br>')
-      : 'занятий нет';
-    return `<button class="row two" data-go="kid" data-id="${k.id}">
-      <span class="n">${esc(k.name)}</span><span class="s">${sum}</span></button>`;
-  }).join('');
   $('#place-list').innerHTML = S.places.map(p =>
     `<button class="row" data-go="place" data-id="${p.id}">${esc(p.name)}${
       p.home ? '<span class="badge">дом</span>' : ''}<i>${p.approx ? '≈ ' : ''}${
@@ -322,7 +421,6 @@ function renderSettings() {
           ['line','по прямой']],
          v => { c.provider = v; ensureMatrix(true).then(() => render()); }) +
     fChk('Учитывать пробки', c.traffic, v => c.traffic = v) +
-    /* поля ключей показываем только для выбранного платного источника */
     (c.provider === 'tomtom' ? fWide('Ключ TomTom', c.tomtomKey, v => c.tomtomKey = v) : '') +
     (c.provider === 'yandex'
       ? fWide('Ключ Яндекса', c.yandexKey, v => c.yandexKey = v) +
@@ -337,49 +435,7 @@ function renderSettings() {
   $('#ver').textContent = 'Маршрут · данные хранятся только на устройстве';
 }
 
-/* ── KID ───────────────────────────────────────────────────────────── */
-function renderKid(id) {
-  const k = kid(id); if (!k) return back();
-  $('#kid-head').innerHTML = fWide('Имя', k.name, v => { k.name = v; });
-  $('#act-list').innerHTML = k.activities.map(a =>
-    `<button class="row two" data-go="act" data-id="${a.id}">
-       <span class="n">${esc(a.title)}${a.src === 'note' ? '<span class="badge">заметка</span>' : ''}</span>
-       <span class="s">${actLine(a)}</span></button>`).join('')
-    || '<div class="hint">пока пусто</div>';
-}
-
-/* ── ACTIVITY ──────────────────────────────────────────────────────── */
-function renderAct(id) {
-  const [, a] = findAct(id); if (!a) return back();
-  const opts = S.places.map(p => [p.id, p.name]);
-
-  $('#act-form').innerHTML =
-    fWide('Название', a.title, v => a.title = v) +
-    fSel('Место', a.placeId, opts, v => a.placeId = v) +
-    `<div class="days">${DOW.map((d, i) =>
-       `<button data-day="${i}" class="${a.days.includes(i) ? 'on' : ''}">${d}</button>`).join('')}</div>` +
-    fTime('Начало', a.start, v => a.start = v) +
-    fTime('Конец', a.end, v => { a.end = v; if (a.pick.earliest < v) a.pick.earliest = v; }) +
-
-    `<div class="grp"><div class="cap">Отвезти</div>` +
-      fChk('Нужен отвоз', a.drop.on, v => { a.drop.on = v; render(); }) +
-      (a.drop.on ? fNum('Быть на месте за, мин', a.drop.leadMin, v => a.drop.leadMin = v, 0, 60) : '') +
-    `</div>` +
-
-    `<div class="grp"><div class="cap">Забрать</div>` +
-      fChk('Нужен забор', a.pick.on, v => { a.pick.on = v; render(); }) +
-      (a.pick.on
-        ? fChk('Обязательно (сами не дойдут)', a.pick.must, v => a.pick.must = v) +
-          fTime('Не раньше', a.pick.earliest, v => a.pick.earliest = v) +
-          fTime('Не позже',  a.pick.latest,   v => a.pick.latest = v) +
-          fNum('На забор, мин', a.pick.serviceMin, v => a.pick.serviceMin = v, 0, 40) +
-          fChk('Можно пешком', a.pick.modes.includes('walk'),
-               v => a.pick.modes = v ? ['car', 'walk'] : ['car'])
-        : '') +
-    `</div>`;
-}
-
-/* ── PLACE ─────────────────────────────────────────────────────────── */
+/* ── АДРЕС ─────────────────────────────────────────────────────────── */
 function renderPlace(id) {
   const p = place(id); if (!p) return back();
   const coordBind = bind(v => {
@@ -399,7 +455,7 @@ function renderPlace(id) {
     `<div class="hint" id="geo-st">${p.approx ? 'координаты приблизительные — уточните' : ''}</div>`;
 }
 
-/* ── NOTES ─────────────────────────────────────────────────────────── */
+/* ── ЗАМЕТКА ───────────────────────────────────────────────────────── */
 function renderNotes() {
   $('#note-text').value = S.cache.note || '';
   $('#sync-cfg').innerHTML =
@@ -408,7 +464,19 @@ function renderNotes() {
     `<button class="row add" data-act="sync">Синхронизировать сейчас</button>`;
 }
 
-/* ── events ────────────────────────────────────────────────────────── */
+/* ── решения мамы на сегодня ───────────────────────────────────────── */
+function toggleDay(bucket, key) {
+  const dk = dayKey();
+  S.cache[bucket] = S.cache[bucket] || {};
+  const set = new Set(S.cache[bucket][dk] || []);
+  set.has(key) ? set.delete(key) : set.add(key);
+  S.cache[bucket][dk] = [...set];
+  const old = dayKey(new Date(Date.now() - 3 * 864e5));
+  for (const k of Object.keys(S.cache[bucket])) if (k < old) delete S.cache[bucket][k];
+  save(); invalidate(); render();
+}
+
+/* ── события ───────────────────────────────────────────────────────── */
 document.addEventListener('change', e => {
   const el = e.target.closest('[data-b]'); if (!el) return;
   const fn = BIND[el.dataset.b]; if (!fn) return;
@@ -425,47 +493,108 @@ document.addEventListener('click', async e => {
   if (b.dataset.go) return go(b.dataset.go, b.dataset.id);
 
   if (b.dataset.day !== undefined) {
-    const [, a] = findAct(cur().p); if (!a) return;
     const d = +b.dataset.day;
-    a.days = a.days.includes(d) ? a.days.filter(x => x !== d) : [...a.days, d].sort();
+    setAll(a => { a.days = a.days.includes(d) ? a.days.filter(x => x !== d) : [...a.days, d].sort(); });
     save(); invalidate(); return render();
   }
 
   const act = b.dataset.act;
   if (!act) return;
 
+  /* — сегодняшние решения — */
+  if (act === 'stay') {
+    /* «подожду на месте» имеет смысл, только если выездов станет меньше.
+       Если детям пришлось бы сидеть в машине дольше разрешённого — откат. */
+    const dk = dayKey(), key = b.dataset.key;
+    const before = plan().trips.length;
+    S.cache.stayOut = S.cache.stayOut || {};
+    const set = new Set(S.cache.stayOut[dk] || []);
+    const adding = !set.has(key);
+    adding ? set.add(key) : set.delete(key);
+    S.cache.stayOut[dk] = [...set];
+    invalidate();
+    if (adding && plan().trips.length >= before) {
+      set.delete(key); S.cache.stayOut[dk] = [...set]; invalidate();
+      FLASH = 'Ждать на месте не получится: кто-то из детей просидел бы в машине ' +
+              'дольше, чем разрешено в настройках.';
+    } else FLASH = '';
+    const old = dayKey(new Date(Date.now() - 3 * 864e5));
+    for (const k of Object.keys(S.cache.stayOut)) if (k < old) delete S.cache.stayOut[k];
+    save(); return render();
+  }
+  if (act === 'pick-self') {                    // ключ — список id занятий
+    FLASH = '';
+    const dk = dayKey();
+    S.cache.pickUp = S.cache.pickUp || {};
+    const set = new Set(S.cache.pickUp[dk] || []);
+    const ids = b.dataset.key.split(',');
+    ids.every(i => set.has(i)) ? ids.forEach(i => set.delete(i)) : ids.forEach(i => set.add(i));
+    S.cache.pickUp[dk] = [...set];
+    const old = dayKey(new Date(Date.now() - 3 * 864e5));
+    for (const k of Object.keys(S.cache.pickUp)) if (k < old) delete S.cache.pickUp[k];
+    save(); invalidate(); return render();
+  }
+  if (act === 'pick-reset') {
+    (S.cache.pickUp || {})[dayKey()] = [];
+    save(); invalidate(); return render();
+  }
+  if (act === 'ride-yes' || act === 'ride-no') {
+    const dk = dayKey();
+    S.cache.rideOk = S.cache.rideOk || {};
+    S.cache.rideOk[dk] = (act === 'ride-yes');
+    for (const k of Object.keys(S.cache.rideOk))
+      if (k < dayKey(new Date(Date.now() - 3 * 864e5))) delete S.cache.rideOk[k];
+    save(); invalidate(); return render();
+  }
+
+  /* — календарь — */
+  if (act === 'edit-cls') {
+    const row = WEEKROWS[+b.dataset.idx]; if (!row) return;
+    EDITING = { refs: [...row.refs] };
+    return go('cls');
+  }
+  if (act === 'add-cls') {
+    const k = S.kids[0];
+    if (!k) { alert('Сначала добавьте ребёнка'); return; }
+    const a = { id: uid('a_'), title:'Новое занятие', teacher:'',
+      placeId: (S.places.find(p => !p.home) || S.places[0]).id,
+      days: [+b.dataset.dow], start: 16 * 60, end: 17 * 60,
+      drop: { on:true, leadMin:10, modes:['car'] },
+      pick: { on:true, must:true, earliest:17 * 60, latest:17 * 60 + 20,
+              serviceMin:5, modes:['car'] } };
+    k.activities.push(a); save(); invalidate();
+    EDITING = { refs: [a.id] };
+    return go('cls');
+  }
+  if (act === 'del-cls') {
+    const ids = editRefs();
+    for (const kk of S.kids) kk.activities = kk.activities.filter(x => !ids.includes(x.id));
+    EDITING = { refs: [] }; save(); invalidate(); return back();
+  }
+  if (act === 'add-place-here') {
+    const p = { id: uid('p_'), name:'Новый адрес', address:'',
+                lat: homePlace().lat, lon: homePlace().lon, approx:true, needsGeo:true };
+    S.places.push(p); setAll(a => a.placeId = p.id); save(); return go('place', p.id);
+  }
+
+  /* — дети — */
   if (act === 'add-kid') {
-    const k = { id: uid('k_'), name: 'Новый', activities: [] };
+    const k = { id: uid('k_'), name:'Новый', icon:'🙂', activities: [] };
     S.kids.push(k); save(); return go('kid', k.id);
   }
   if (act === 'del-kid') {
     S.kids = S.kids.filter(k => k.id !== cur().p); save(); invalidate(); return back();
   }
 
-  if (act === 'add-activity') {
-    const k = kid(cur().p);
-    const a = { id: uid('a_'), title: 'Занятие', placeId: S.places[1]?.id || S.places[0].id,
-      days: [1, 2, 3, 4, 5], start: 16 * 60, end: 17 * 60,
-      drop: { on: true, leadMin: 5, modes: ['car'] },
-      pick: { on: true, must: true, earliest: 17 * 60, latest: 17 * 60 + 30,
-              serviceMin: 5, modes: ['car', 'walk'] } };
-    k.activities.push(a); save(); invalidate(); return go('act', a.id);
-  }
-  if (act === 'del-activity') {
-    const [k] = findAct(cur().p); if (!k) return back();
-    k.activities = k.activities.filter(a => a.id !== cur().p);
-    save(); invalidate(); return back();
-  }
-
+  /* — адреса — */
   if (act === 'add-place') {
-    const p = { id: uid('p_'), name: 'Новый адрес', address: '',
-                lat: homePlace().lat, lon: homePlace().lon, approx: true };
+    const p = { id: uid('p_'), name:'Новый адрес', address:'',
+                lat: homePlace().lat, lon: homePlace().lon, approx:true };
     S.places.push(p); save(); return go('place', p.id);
   }
   if (act === 'del-place') {
     S.places = S.places.filter(p => p.id !== cur().p); save(); invalidate(); return back();
   }
-
   if (act === 'geo') {
     const p = place(cur().p), st = $('#geo-st'); st.textContent = 'ищу…';
     try {
@@ -475,15 +604,7 @@ document.addEventListener('click', async e => {
     return;
   }
 
-  if (act === 'ride-yes' || act === 'ride-no') {
-    const dk = dayKey();
-    S.cache.rideOk = S.cache.rideOk || {};
-    S.cache.rideOk[dk] = (act === 'ride-yes');
-    for (const k of Object.keys(S.cache.rideOk))          // храним только свежие ответы
-      if (k < dayKey(new Date(Date.now() - 3 * 864e5))) delete S.cache.rideOk[k];
-    save(); invalidate(); return render();
-  }
-
+  /* — код — */
   if (act === 'vault-open') {
     const code = $('#vault-code').value.trim();
     const msg = $('#vault-msg');
@@ -498,6 +619,7 @@ document.addEventListener('click', async e => {
   }
   if (act === 'vault') return go('vault');
 
+  /* — допущения — */
   if (act === 'assume') return go('assume');
   if (act === 'assume-ok') {
     S.cache.okNotes = [...(S.cache.okNotes || []), b.dataset.id];
@@ -508,8 +630,8 @@ document.addEventListener('click', async e => {
     save(); return back();
   }
 
+  /* — заметка — */
   if (act === 'notes') return go('notes');
-
   if (act === 'parse') {
     S.cache.note = $('#note-text').value; save();
     const { rows, warn } = parseNote(S.cache.note);
@@ -529,7 +651,7 @@ document.addEventListener('click', async e => {
     const todo = S.places.filter(p => p.needsGeo);
     $('#parse-out').textContent = `добавлено занятий: ${n}` +
       (todo.length ? ` · ищу ${todo.length} адрес(а)…` : '');
-    for (const p of todo) {                       // Nominatim asks for ≤1 req/sec
+    for (const p of todo) {
       try { Object.assign(p, await geocode(p.address), { needsGeo: false }); }
       catch { p.approx = true; }
       save();
@@ -548,6 +670,7 @@ document.addEventListener('click', async e => {
     return;
   }
 
+  /* — техника — */
   if (act === 'ytest') {
     const o = $('#ytest-out'); o.textContent = 'проверяю…';
     const r = await testProvider();
@@ -559,13 +682,12 @@ document.addEventListener('click', async e => {
         (r.delay ? `<br>задержка из-за пробок: ${Math.round(r.delay / 60)} мин` : '');
     return;
   }
-
   if (act === 'perm') { await askPerm(); return render(); }
   if (act === 'test') { return fire('Проверка', 'Уведомления работают', 'test'); }
 
   if (act === 'export') {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type:'application/json' }));
     a.download = 'marshrut.json'; a.click();
     return;
   }
@@ -578,13 +700,12 @@ document.addEventListener('click', async e => {
   }
   if (act === 'reset') {
     localStorage.removeItem(KEY); localStorage.removeItem(FKEY);
-    load(); invalidate(); stack = [{ v: 'now' }]; return render();
+    load(); invalidate(); stack = [{ v:'now' }]; return render();
   }
 });
 
-/* ── boot ──────────────────────────────────────────────────────────── */
+/* ── старт ─────────────────────────────────────────────────────────── */
 (async function boot() {
-  /* первый запуск и рядом лежит зашифрованное расписание — спросим код */
   if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
   render();
   initSW();
