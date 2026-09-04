@@ -147,6 +147,12 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #offer .qb button:last-child{color:var(--mut)}
 #offer .qb button:active{opacity:.5}
 
+.leg i.slip{color:var(--hot)}
+.qb.steps{display:flex;gap:10px;margin-top:20px}
+.qb.steps button{flex:1;background:none;border:1px solid var(--line);border-radius:9px;
+  color:var(--ink);font:inherit;font-size:14px;padding:12px 0;cursor:pointer}
+.qb.steps button:active{opacity:.5}
+
 /* trips — маршрут «из дома … и домой» */
 .trip{display:block;width:100%;text-align:left;background:none;border:0;
       color:var(--ink);font:inherit;

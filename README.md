@@ -13,8 +13,21 @@ browser and all data stays in `localStorage` on the device.
 ## Screens
 
 **`Сегодня`** shows one movement at a time — one drive or one walk, never the
-whole outing — under a countdown that turns into «В пути, приедем через …» once
-you have set off. The teacher's name appears here and nowhere else, because it
+whole outing.
+
+A step is not closed by the clock. If the departure time passes and nothing says
+you actually left, the countdown becomes **«Опаздываем на N»** and the arrival is
+recomputed from now rather than from the plan; the step stays put instead of
+sliding on to the next place. Two buttons — *выехали* and *на месте* — settle it,
+and an arrival more than a few minutes behind schedule is named on the leg: «на
+23 мин позже плана (13:41)». A step closes itself only long after its arrival
+time, so the screen can never get permanently stuck.
+
+`Настройки → Подсказывать по местоположению` does those two taps for you where it
+can: if the phone is still at the origin past departure it knows you have not
+left, and it can tell when you have arrived. Location is only ever a hint — a web
+app gets no background location on iOS, so everything works the same without the
+permission, just with more tapping. The teacher's name appears here and nowhere else, because it
 only matters for the thing you are about to drive to. The rest of the day
 follows immediately underneath, with no reserved blank space, filtered to what
 is still ahead.

@@ -51,6 +51,8 @@ function defaults() {
     cfg: {
       seats: 5,             // мест в машине (не считая взрослого)
       tripPenalty: 22,      // «стоимость» одного лишнего выезда, мин
+      graceMin: 25,        // через сколько минут после прибытия шаг считается закрытым сам
+      geo: false,          // подсказывать по местоположению
       maxWait: 40,          // дольше ждать — лучше съездить домой
       maxRide: 45,          // дольше катать ребёнка за один выезд нельзя
       skipPenalty: 35,      // штраф за пропуск необязательного заезда
@@ -69,7 +71,7 @@ function defaults() {
       syncHours: 2
     },
     cache: { matrix: {}, syncedAt: 0, note: '', okNotes: [],
-             rideOk: {}, stayOut: {}, pickUp: {}, learn: {} }
+             rideOk: {}, stayOut: {}, pickUp: {}, learn: {}, steps: {} }
   };
 }
 

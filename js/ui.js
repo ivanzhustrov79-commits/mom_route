@@ -152,6 +152,22 @@ function plan(force) {
 }
 const invalidate = () => { PLAN = null; };
 
+/* Шаги, которые мама отметила сама: «выехали» и «на месте». */
+const stepMarks = () => (S.cache.steps || {})[dayKey()] || {};
+const stepDone  = () => new Set(Object.entries(stepMarks())
+                          .filter(([, v]) => v && v.arrived).map(([k]) => k));
+
+function markStep(key, field) {
+  const dk = dayKey();
+  S.cache.steps = S.cache.steps || {};
+  const day = S.cache.steps[dk] = S.cache.steps[dk] || {};
+  const cur = day[key] = day[key] || {};
+  cur[field] = cur[field] ? 0 : Math.round(nowMin());   // повторное нажатие снимает
+  const old = dayKey(new Date(Date.now() - 3 * 864e5));
+  for (const k of Object.keys(S.cache.steps)) if (k < old) delete S.cache.steps[k];
+  save(); invalidate(); render();
+}
+
 /* ── карточки дня ──────────────────────────────────────────────────── */
 /* Выезд показываем как маршрут: из дома → остановки с действием → домой.
    Педагога называем только у ближайшего события, чтобы не шуметь.      */
@@ -215,7 +231,9 @@ function aloneCardHome(r) {
 }
 
 function renderNow() {
-  const p = plan(), t = nowMin(), st = nextStep(p, t);
+  const p = plan(), t = nowMin();
+  const done = stepDone();
+  const st = nextStep(p, t, new Date(), done);
   const hero = $('#hero');
   hero.className = '';
 
@@ -228,39 +246,62 @@ function renderNow() {
   } else {
     const onFoot = st.mode === 'walk';
     const fromHome = !!place(st.from)?.home;
-    const toLeave = st.leave - t, toArrive = st.arrive - t;
+    const mark = stepMarks()[st.key] || {};
+    const mins = Math.round(stepMinutes(st));
     const big = n => n < 90 ? `<span>${n}</span><i>мин</i>`
                             : `<span>${(n / 60 | 0)}:${String(n % 60).padStart(2, '0')}</span><i>ч</i>`;
 
-    if (toLeave > 0.5) {                       // ещё дома
-      if (toLeave <= 10) hero.classList.add('hot');
-      $('#hero-label').textContent = onFoot ? 'Выход через' : 'Выезд через';
-      $('#hero-num').innerHTML = big(Math.round(toLeave));
-    } else if (toLeave > -2) {                 // ровно сейчас
+    /* Уехали или нет — вопрос факта, а не расписания. Верим отметке, потом
+       геолокации, и только потом часам.                                   */
+    const atStart = nearPlace(st.from);
+    const gone = mark.left ? true : (atStart === true ? false : null);
+    const late = t - st.leave;
+    let eta = st.arrive;
+
+    if (gone === true) {                       // точно в пути
+      eta = (mark.left || t) + mins;
+      $('#hero-label').textContent = onFoot ? 'В пути пешком, придём в' : 'В пути, приедем в';
+      $('#hero-num').innerHTML = `<span>${m2hm(eta)}</span>`;
+      if (eta > st.arrive + 5) hero.classList.add('hot');
+    } else if (late > 1 && gone === false) {   // стоим дома, а пора бы ехать
       hero.classList.add('hot');
+      eta = t + mins;
+      $('#hero-label').textContent = 'Опаздываем на';
+      $('#hero-num').innerHTML = big(Math.round(late));
+    } else if (late > 1) {                     // время вышло, но факта не знаем
+      hero.classList.add('hot');
+      eta = t + mins;
       $('#hero-label').textContent = onFoot ? 'Пора выходить' : 'Пора выезжать';
       $('#hero-num').innerHTML = `<span>сейчас</span>`;
-    } else {                                   // уже в пути
-      $('#hero-label').textContent = onFoot ? 'В пути пешком, дойдём через'
-                                            : 'В пути, приедем через';
-      $('#hero-num').innerHTML = big(Math.max(0, Math.round(toArrive)));
+    } else {
+      if (late > -10) hero.classList.add('hot');
+      $('#hero-label').textContent = onFoot ? 'Выход через' : 'Выезд через';
+      $('#hero-num').innerHTML = big(Math.round(-late));
     }
 
-    const mins = Math.round(stepMinutes(st));
+    const slip = Math.round(eta - st.arrive);
     const lead = `${onFoot ? 'выход' : 'выезд'} ${fromHome ? 'из дома' : 'от «' + esc(place(st.from)?.name || '') + '»'}` +
                  ` в ${m2hm(st.leave)} · ${mins} мин ${onFoot ? 'пешком' : 'в пути'}`;
     const body = st.kind === 'home'
-      ? `<div class="leg home"><b>${m2hm(st.arrive)}</b><div><span>дом</span></div></div>`
-      : `<div class="leg"><b>${m2hm(st.arrive)}</b><div>
+      ? `<div class="leg home"><b>${m2hm(eta)}</b><div><span>дом</span>
+           ${slip > 4 ? `<i class="slip">на ${slip} мин позже плана (${m2hm(st.arrive)})</i>` : ''}
+         </div></div>`
+      : `<div class="leg"><b>${m2hm(eta)}</b><div>
            <span>${esc(place(st.to)?.name || '?')}</span>
            <i>${st.kind === 'drop' ? 'отвезти' : 'забрать'}: ${namesOf(st.kidIds)}</i>
            ${st.teacher ? `<i>${esc(st.teacher)}</i>` : ''}
+           ${slip > 4 ? `<i class="slip">на ${slip} мин позже плана (${m2hm(st.arrive)})</i>` : ''}
          </div></div>`;
+
     $('#hero-sub').innerHTML =
       `<div class="hlead"><span class="ic">${onFoot ? ICON.walk : ICON.car}</span><span>${lead}</span></div>` +
-      `<div class="legs">${body}</div>`;
+      `<div class="legs">${body}</div>` +
+      `<div class="qb steps">
+         <button data-act="step-left" data-key="${esc(st.key)}">${
+           mark.left ? '↺ не выехали' : (onFoot ? 'вышли' : 'выехали')}</button>
+         <button data-act="step-here" data-key="${esc(st.key)}">на месте</button>
+       </div>`;
   }
-
 
   const cf = dayConflicts(new Date());
   const wn = $('#warn');
@@ -544,6 +585,10 @@ function renderSettings() {
           ['line','по прямой']],
          v => { c.provider = v; ensureMatrix(true).then(() => render()); }) +
     fChk('Учитывать пробки', c.traffic, v => c.traffic = v) +
+    fNum('Шаг закрывается сам через, мин', c.graceMin == null ? 25 : c.graceMin,
+         v => c.graceMin = v, 5, 120) +
+    fChk('Подсказывать по местоположению', c.geo,
+         v => { c.geo = v; v ? geoStart() : geoStop(); }) +
     (c.provider === 'tomtom' ? fWide('Ключ TomTom', c.tomtomKey, v => c.tomtomKey = v) : '') +
     (c.provider === 'yandex'
       ? fWide('Ключ Яндекса', c.yandexKey, v => c.yandexKey = v) +
@@ -765,6 +810,9 @@ document.addEventListener('click', async e => {
   if (!act) return;
 
   /* — сегодняшние решения — */
+  if (act === 'step-left') return markStep(b.dataset.key, 'left');
+  if (act === 'step-here') return markStep(b.dataset.key, 'arrived');
+
   if (act === 'prop-yes') {                       // «так и делай»
     const dk = dayKey();
     S.cache.okProp = S.cache.okProp || {};
@@ -1036,6 +1084,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
   render();
   measureBar();
+  if (S.cfg.geo) geoStart();
 
   checkAppUpdate();
   /* установленное приложение просыпается, а не запускается — проверим и тут */

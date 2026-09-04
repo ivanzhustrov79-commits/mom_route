@@ -363,15 +363,15 @@ function spareBlocks(p, date = new Date(), minMin = 20) {
 function daySteps(p, date = new Date()) {
   const dow = date.getDay(), home = homePlace().id, out = [];
   for (const t of p.trips) {
-    let leave = t.depart, from = home;
+    let leave = t.depart, from = home, i = 0;
     for (const s of t.stops) {
-      out.push({ leave, from, to: s.placeId, arrive: s.arrive, kind: s.kind,
-                 kidIds: s.kidIds, teacher: s.teacher, title: s.title,
+      out.push({ key: t.id + '#' + i++, leave, from, to: s.placeId, arrive: s.arrive,
+                 kind: s.kind, kidIds: s.kidIds, teacher: s.teacher, title: s.title,
                  mode: t.mode, trip: t });
       leave = s.arrive + s.service; from = s.placeId;
     }
-    out.push({ leave, from, to: home, arrive: t.home, kind: 'home',
-               kidIds: [], mode: t.mode, trip: t });
+    out.push({ key: t.id + '#home', leave, from, to: home, arrive: t.home,
+               kind: 'home', kidIds: [], mode: t.mode, trip: t });
   }
   return out.sort((a, b) => a.leave - b.leave);
 }
@@ -382,10 +382,19 @@ function stepMinutes(st, date = new Date()) {
                             : drive(st.from, st.to, st.leave, date.getDay());
 }
 
-/* Ближайший шаг: пока не приехали — это всё ещё текущий шаг, а не следующий.
-   Иначе на полпути экран показывал бы уже другое место.                  */
-function nextStep(p, t = nowMin(), date = new Date()) {
-  return daySteps(p, date).find(s => s.arrive > t - 1) || null;
+/* Ближайший шаг — тот, который ещё не закрыт.
+   Раньше шаг закрывался просто по часам: настало время прибытия — значит,
+   доехали. Но если мама ещё дома, это неправда, и экран начинал показывать
+   следующее место, пока текущее не сделано. Теперь шаг закрывается только
+   отметкой «на месте» — или когда с расчётного прибытия прошло совсем много
+   времени, чтобы не залипнуть навсегда.                                  */
+function stepClosed(st, t, done) {
+  if (done && done.has(st.key)) return true;
+  return t > st.arrive + (S.cfg.graceMin == null ? 25 : S.cfg.graceMin);
+}
+
+function nextStep(p, t = nowMin(), date = new Date(), done = null) {
+  return daySteps(p, date).find(s => !stepClosed(s, t, done)) || null;
 }
 function nextTrip(plan, t = nowMin()) {
   return plan.trips.find(x => x.depart > t - 3) || null;
