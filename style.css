@@ -82,6 +82,10 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .wempty{padding:14px 0;border-top:1px solid var(--line);font-size:14px;color:var(--mut)}
 .wconf{padding:12px 0;border-top:1px solid var(--hot);font-size:13px;color:var(--hot);line-height:1.5}
 
+.chk{font-size:13px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.chk.y{color:var(--ink)}
+.chk.n{color:var(--hot)}
+
 /* предложение приложения прямо на карточке */
 .prop{display:flex;align-items:flex-start;gap:12px;margin-top:12px;padding-top:11px;
       border-top:1px dashed var(--line)}

@@ -131,7 +131,7 @@ function buildPlan() {
 
   const loose = planDay(d, { ...o, maxRide: 24 * 60 });
   const worst = loose.trips.reduce((a, b) => (b.ride > (a ? a.ride : -1) ? b : a), null);
-  const long = worst && worst.ride > S.cfg.maxRide;
+  const long = worst && worst.ride > rideCap(worst.rideKid);
 
   if (said === true) return long ? { ...loose, longRide: worst } : strict;
 
@@ -168,7 +168,7 @@ function legsHtml(t, teach) {
 
 function tripRow(x, now) {
   const extra = (x.mode === 'walk' ? '' : `${Math.round(x.driveMin)} мин за рулём`) +
-    (x.ride > S.cfg.maxRide && x.rideKid
+    (x.ride > rideCap(x.rideKid) && x.rideKid
       ? ` · ${kidLabel(kid(x.rideKid) || {name:''})} в машине ${dur(x.ride)}` : '');
   return `<div class="trip ${now != null && x.depart < now - 2 ? 'done' : ''}">
       <div class="th">
@@ -483,8 +483,11 @@ function renderKid(id) {
     fWide('Картинка (эмодзи)', k.icon || '', v => { k.icon = v.trim().slice(0, 4); }) +
     fNum('Один дома не дольше, мин', k.maxAlone == null ? 180 : k.maxAlone,
          v => { k.maxAlone = v; }, 0, 600) +
+    fNum('В машине не дольше, мин (0 — без границы)',
+         k.maxRide == null ? S.cfg.maxRide : k.maxRide, v => { k.maxRide = v; }, 0, 600) +
     `<div class="hint">${k.icon || '—'} ${esc(k.name)}${
-       (k.maxAlone === 0) ? ' · одного дома не оставляем' : ''}</div>`;
+       (k.maxAlone === 0) ? ' · одного дома не оставляем' : ''}${
+       (k.maxRide === 0) ? ' · кататься может сколько угодно' : ''}</div>`;
 }
 
 /* ── ДОПУЩЕНИЯ ─────────────────────────────────────────────────────── */
@@ -552,8 +555,32 @@ function renderSettings() {
      <div class="hint" id="ytest-out"></div>`;
 
   $('#perm-st').textContent = ('Notification' in window) ? Notification.permission : 'нет';
+  notifyReport();
   $('#ver').textContent = 'Маршрут ' + (S.cache.appVersion || '') +
     ' · данные хранятся только на устройстве';
+}
+
+/* Уведомления на айфоне включаются только при совпадении нескольких условий.
+   Показываем каждое отдельно — иначе непонятно, что именно не так.       */
+async function notifyReport() {
+  const box = $('#notify-st'); if (!box) return;
+  const standalone = matchMedia('(display-mode: standalone)').matches ||
+                     navigator.standalone === true;
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
+  let regs = 0;
+  try { regs = (await navigator.serviceWorker.getRegistrations()).length; } catch {}
+  const rows = [
+    ['защищённое соединение (https)', isSecureContext],
+    ['браузер умеет уведомления', 'Notification' in window],
+    ['разрешение выдано', ('Notification' in window) && Notification.permission === 'granted'],
+    ['служебный работник зарегистрирован', regs > 0],
+    [ios ? 'добавлено на домашний экран' : 'открыто как приложение', standalone]
+  ];
+  box.innerHTML = rows.map(([t, ok]) =>
+      `<div class="chk ${ok ? 'y' : 'n'}">${ok ? '✓' : '✗'} ${esc(t)}</div>`).join('') +
+    `<p class="hint">Пока приложение открыто, напоминания приходят. Закрытое
+     приложение iOS не будит — это ограничение веб-приложений, а не настройка.
+     ${ios && !standalone ? '<b>Сейчас главное: «Поделиться» → «На экран Домой».</b>' : ''}</p>`;
 }
 
 /* ── АДРЕС ─────────────────────────────────────────────────────────── */
@@ -930,13 +957,6 @@ document.addEventListener('click', async e => {
         (r.delay ? `<br>задержка из-за пробок: ${Math.round(r.delay / 60)} мин` : '');
     return;
   }
-  if (act === 'app-update') {
-    b.textContent = 'обновляю…';
-    const v = await liveVersion();
-    S.cache.appVersion = v || S.cache.appVersion; save();
-    await dropCaches();
-    return location.reload();
-  }
   if (act === 'perm') { await askPerm(); return render(); }
   if (act === 'test') { return fire('Проверка', 'Уведомления работают', 'test'); }
 
@@ -980,6 +1000,10 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   measureBar();
 
   checkAppUpdate();
+  /* установленное приложение просыпается, а не запускается — проверим и тут */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkAppUpdate();
+  });
 
   /* расписание в репозитории могли перешифровать — заметим это сами */
   if (!FIRST_RUN && S.cache.vaultTag) vaultTag().then(tag => {

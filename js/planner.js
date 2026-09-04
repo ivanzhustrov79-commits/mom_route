@@ -71,7 +71,14 @@ function buildStops(date) {
 /* потолок «сколько ребёнок едет с мамой»: обычно из настроек, но planDay умеет
    пересчитать день без него — чтобы предложить маме выбор */
 let RIDE_CAP = null;
-const rideCap = () => RIDE_CAP == null ? S.cfg.maxRide : RIDE_CAP;
+/* У старших запас терпения свой, у малышей свой. 0 или пусто — без границы. */
+function rideCap(kidId) {
+  if (RIDE_CAP != null) return RIDE_CAP;
+  const k = kidId && kid(kidId);
+  const v = k && k.maxRide;
+  if (v == null) return S.cfg.maxRide;
+  return v <= 0 ? Infinity : v;
+}
 
 /* 2 ── is stops[i..j] doable as ONE outing from home?  ─────────────────
    Schedule shape: the LAST stop as early as its window allows (nobody waits
@@ -149,8 +156,11 @@ function outing(stops, i, j, dow) {
 
   /* сколько каждый ребёнок просидит в машине за этот выезд */
   const aboard = new Map();
-  let ride = 0, rideKid = null;
-  const mark = (id, mins) => { if (mins > ride) { ride = mins; rideKid = id; } };
+  let ride = 0, rideKid = null, over = false;
+  const mark = (id, mins) => {
+    if (mins > ride) { ride = mins; rideKid = id; }
+    if (mins > rideCap(id)) over = true;          // терпение именно этого ребёнка
+  };
   for (let x = 0; x < n; x++) {
     const s = seg[x], t = a[x] + s.service;
     for (const id of s.kidIds) {
@@ -161,7 +171,7 @@ function outing(stops, i, j, dow) {
     }
   }
   for (const [id, t] of aboard) mark(id, homeT - t);
-  if (ride > rideCap()) return null;
+  if (over) return null;
 
   return {
     depart, ride, rideKid,
