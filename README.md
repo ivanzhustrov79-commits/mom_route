@@ -34,6 +34,11 @@ and an arrival more than a few minutes behind schedule is named on the leg: «н
 23 мин позже плана (13:41)». A step closes itself only long after its arrival
 time, so the screen can never get permanently stuck.
 
+When the fix is fresh and accurate the two buttons disappear entirely and the
+screen just says it is watching; they come back when the signal is stale, the
+accuracy is hopeless, tracking is off — or when a step is already overdue, which
+usually means an unplanned stop the app cannot see.
+
 `Настройки → Подсказывать по местоположению` does those two taps for you where it
 can: if the phone is still at the origin past departure it knows you have not
 left, and it can tell when you have arrived. Location is only ever a hint — a web

@@ -64,4 +64,15 @@ function nearPlace(placeId, m = 200) {
   return d <= m + Math.min(g.acc || 0, 150);
 }
 
+/* Насколько можно верить координатам прямо сейчас.
+   Важно: «далеко от всехзнакомых мест» — это НЕ поломка, а обычная середина
+   поездки. Признак беды — отсутствие свежей засечки или дикая погрешность. */
+function geoState() {
+  if (!S.cfg.geo || !geoWatch) return 'off';
+  const g = geoFresh();
+  if (!g) return 'lost';                       // разрешение сняли или нет сигнала
+  if (g.acc != null && g.acc > 500) return 'lost';
+  return 'ok';
+}
+
 const geoOn = () => !!geoWatch;

@@ -382,14 +382,24 @@ function renderNow() {
     $('#hero-sub').innerHTML =
       `<div class="hlead"><span class="ic">${onFoot ? ICON.walk : ICON.car}</span><span>${lead}</span></div>` +
       `<div class="legs">${body}</div>` +
-      (S.cfg.geo && isParent() && geoFresh()
-        ? `<div class="hint" style="margin-top:14px">Слежу по местоположению — отмечать вручную не нужно</div>`
-        : '') +
-      `<div class="qb steps">
-         <button data-act="step-left" data-key="${esc(st.key)}">${
-           mark.left ? '↺ не выехали' : (onFoot ? 'вышли' : 'выехали')}</button>
-         <button data-act="step-here" data-key="${esc(st.key)}">на месте</button>
-       </div>`;
+      /* Кнопки нужны, когда приложение само разобраться не может: сигнала
+         нет, слежение выключено — или шаг уже просрочен, а значит мама
+         заехала куда-то помимо плана и ждать автоотметки бессмысленно.  */
+      (() => {
+        const gps = isParent() ? geoState() : 'off';
+        const overdue = t > st.arrive;
+        if (gps === 'ok' && !overdue)
+          return `<div class="hint" style="margin-top:14px">Слежу по местоположению —
+                   отмечать ничего не нужно</div>`;
+        return (gps === 'lost'
+                 ? `<div class="hint" style="margin-top:14px;color:var(--warn)">Сигнала нет —
+                     отметьте сами</div>` : '') +
+          `<div class="qb steps">
+             <button data-act="step-left" data-key="${esc(st.key)}">${
+               mark.left ? '↺ не выехали' : (onFoot ? 'вышли' : 'выехали')}</button>
+             <button data-act="step-here" data-key="${esc(st.key)}">на месте</button>
+           </div>`;
+      })();
   }
 
   const cf = dayConflicts(new Date());
