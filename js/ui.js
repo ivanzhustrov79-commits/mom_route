@@ -556,6 +556,19 @@ function renderSettings() {
 
   $('#perm-st').textContent = ('Notification' in window) ? Notification.permission : 'нет';
   notifyReport();
+
+  const c2 = S.cfg;
+  $('#push-cfg').innerHTML =
+    fWide('Адрес воркера', c2.pushUrl, v => c2.pushUrl = v.trim()) +
+    fWide('Общий пароль', c2.pushSecret, v => c2.pushSecret = v.trim()) +
+    `<button class="row add" data-act="push-on">Включить и передать расписание</button>
+     <button class="row add" data-act="push-test">Проверить доставку</button>
+     <button class="row add" data-act="push-off">Отключить</button>
+     <div class="hint" id="push-st">${S.cache.pushAt
+        ? 'передано будильников: ' + (S.cache.pushCount || 0) + ' · ' +
+          new Date(S.cache.pushAt).toLocaleString('ru-RU',
+            { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+        : 'пока не подключено'}</div>`;
   $('#ver').textContent = 'Маршрут ' + (S.cache.appVersion || '') +
     ' · данные хранятся только на устройстве';
 }
@@ -957,6 +970,22 @@ document.addEventListener('click', async e => {
         (r.delay ? `<br>задержка из-за пробок: ${Math.round(r.delay / 60)} мин` : '');
     return;
   }
+  if (act === 'push-on' || act === 'push-test' || act === 'push-off') {
+    const o = $('#push-st'); o.textContent = 'секунду…';
+    try {
+      if (act === 'push-off') { await pushForget(); o.textContent = 'отключено'; }
+      else if (act === 'push-test') {
+        const r = await pushTest();
+        o.textContent = r.status >= 200 && r.status < 300
+          ? 'воркер принял, уведомление придёт через несколько секунд'
+          : 'служба доставки ответила ' + r.status;
+      } else {
+        const r = await pushSync();
+        o.textContent = `передано будильников: ${r.queued}`;
+      }
+    } catch (e) { o.textContent = 'не вышло: ' + (e.message || e); }
+    return;
+  }
   if (act === 'perm') { await askPerm(); return render(); }
   if (act === 'test') { return fire('Проверка', 'Уведомления работают', 'test'); }
 
@@ -1022,6 +1051,8 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
     checkAlerts(plan());
     if (cur().v === 'now') renderNow();
   }, 10000);
+
+  setInterval(() => { if (S.cfg.pushUrl && S.cache.pushAt) pushSync().catch(() => {}); }, 3600e3);
 
   setInterval(() => syncNote().then(r => { if (r && r.imported) { invalidate(); render(); } }), 10 * 60000);
   setInterval(() => ensureMatrix(true).then(() => { invalidate(); if (cur().v === 'now') renderNow(); }), 30 * 60000);

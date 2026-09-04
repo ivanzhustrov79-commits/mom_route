@@ -63,6 +63,8 @@ function defaults() {
       yandexKey: '',
       yandexTraffic: 'auto',
       traffic: true,
+      pushUrl: '',
+      pushSecret: '',
       syncUrl: '',
       syncHours: 2
     },

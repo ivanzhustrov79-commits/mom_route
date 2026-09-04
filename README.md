@@ -112,12 +112,46 @@ reports what the current source actually returns.
 Alerts at 30 / 10 / 0 minutes before departure, configurable. iOS only allows
 web notifications for a PWA added to the Home Screen (iOS 16.4+), over https.
 
-A web app cannot run in the background on iOS: while open it holds a screen
-wake-lock and ticks every 10 s, and when closed iOS gives it no timer. A native
-build would schedule `UNCalendarNotificationTrigger` local notifications a day
-ahead and refresh them on a `BGAppRefreshTask`; `js/planner.js` is pure functions
-over a state object and ports across unchanged. A native app would also get
-traffic-aware ETAs free from `MKDirections.calculateETA()`, with no API key.
+A closed web app gets no timer from iOS, so reminders need something outside it.
+
+### Background reminders without giving away the schedule
+
+`worker/` is a Cloudflare Worker that acts as an **alarm clock, not a postman**.
+The phone sends it a list of moments — nothing else — and at the right minute it
+sends a Web Push with **no payload at all**. The service worker wakes, reads the
+text from the device's own IndexedDB and shows it. Neither Cloudflare nor Apple
+ever sees a name, an address or a child.
+
+Deploy it with `worker/README.md`. Where the keys live:
+
+| | Where | Secret? |
+|---|---|---|
+| VAPID public key | `js/push.js`, `worker/wrangler.toml` | no — public by design |
+| VAPID private key | `wrangler secret put VAPID_PRIVATE` | **yes**, never in git |
+| Shared password | `wrangler secret put APP_SECRET` + the phone's settings | **yes** |
+| Cloudflare API token | not needed — `wrangler login` uses the browser | — |
+
+Then in the app: `Настройки → Фоновые уведомления` — the worker address and the
+same password, then *Включить и передать расписание*. The queue is refreshed
+hourly while the app is open and covers a week ahead.
+
+Free tier covers it: the cron fires once a minute regardless of how many
+reminders there are, which is about 1 500 invocations a day against a 100 000
+limit.
+
+### Without any of that
+
+Alerts fire while the app is open, and a missed threshold is announced on the
+next open with the real time remaining rather than swallowed. That makes a
+Shortcuts automation — *Время суток → Открыть приложение* a few times a day —
+a working, free substitute.
+
+### The native route
+
+`UNCalendarNotificationTrigger` schedules the whole day ahead and fires with the
+app shut, no server and nothing leaving the phone. `js/planner.js` is pure
+functions over a state object and ports across unchanged. A native app would also
+get traffic-aware ETAs free from `MKDirections.calculateETA()`, with no API key.
 
 ## Files
 
@@ -129,6 +163,9 @@ js/travel.js        geocoding, routing matrix, traffic model
 js/planner.js       stop building, feasibility, DP optimiser, conflict detection
 js/notes.js         text schedule parser
 js/notify.js        30/10/0 alerts, dedupe, wake-lock
+js/idb.js           on-device alarm texts, readable by the service worker
+js/push.js          subscription + the week's alarm times for the worker
+worker/             Cloudflare Worker: an alarm clock that carries no content
 js/ui.js            router, rendering, field binding
 sw.js               offline shell + notification click
 test/headless.js    node test/headless.js — exercises the planner without a browser
