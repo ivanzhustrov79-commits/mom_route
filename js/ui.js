@@ -247,11 +247,15 @@ function tripRow(x, now) {
     </div>`;
 }
 
-/* свободное окно: где мама и до какого часа. Нажатие меняет место. */
-function spareCard(g) {
+/* Свободное окно: где мама и до какого часа. Если окно уже началось,
+   считаем от «сейчас» — иначе карточка с прошедшим временем в заголовке
+   встаёт выше ближайшего шага и выглядит несвежей.                    */
+function spareCard(g, t = nowMin()) {
+  const started = g.from < t;
   return `<div class="trip spare">
-      <div class="th"><span class="t">${m2hm(g.from)}</span>
-        <span class="lbl">свободно ${dur(g.to - g.from)} · до ${m2hm(g.to)}</span></div>
+      <div class="th"><span class="t">${started ? 'сейчас' : m2hm(g.from)}</span>
+        <span class="lbl">свободно ${started ? 'ещё ' : ''}${
+          dur(g.to - Math.max(g.from, t))} · до ${m2hm(g.to)}</span></div>
       <div class="leg"><b></b><div><span>${esc(place(g.placeId)?.name || '')}</span></div></div>
       ${propHtml(spareProposal(g))}
     </div>`;
@@ -383,7 +387,8 @@ function renderNow() {
   for (const x of p.trips) if (x.home > t - 3) items.push({ at: x.depart, html: tripRow(x, t) });
   if (isParent()) {
     for (const r of unattended(p, new Date())) if (r.at > t - 3) items.push({ at: r.at, html: aloneCard(r) });
-    for (const g of spareBlocks(p, new Date())) if (g.to > t) items.push({ at: g.from, html: spareCard(g) });
+      for (const g of spareBlocks(p, new Date())) if (g.to > t)
+      items.push({ at: Math.max(g.from, t), html: spareCard(g, t) });
     for (const r of aloneAtHome(p, new Date())) if (r.to > t) items.push({ at: r.from, html: aloneCardHome(r) });
   }
   items.sort((a, b) => a.at - b.at);
@@ -1181,10 +1186,21 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   nativeInit();                     // в нативной оболочке — локальные уведомления
 
   checkAppUpdate();
-  /* установленное приложение просыпается, а не запускается — проверим и тут */
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') checkAppUpdate();
-  });
+
+  /* iOS усыпляет приложение вместе с его таймерами: экран, на который
+     возвращаешься, нарисован в момент засыпания. Поэтому по пробуждении
+     пересчитываем день заново, а не только ищем обновление.            */
+  function wakeUp() {
+    if (document.visibilityState !== 'visible') return;
+    if (planDK !== dayKey()) invalidate();
+    geoAutoStep(plan());
+    checkAlerts(plan());
+    if (cur().v === 'now') renderNow();
+    checkAppUpdate();
+  }
+  document.addEventListener('visibilitychange', wakeUp);
+  addEventListener('pageshow', wakeUp);      // возврат из кэша страниц
+  addEventListener('focus', wakeUp);
 
   /* расписание в репозитории могли перешифровать — заметим это сами */
   if (!FIRST_RUN && S.cache.vaultTag) vaultTag().then(tag => {
