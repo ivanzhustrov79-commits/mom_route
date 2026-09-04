@@ -133,7 +133,8 @@ screen says so in red and names the shortfall.
 |---|---|---|
 | Geocoding | yes | OpenStreetMap Nominatim — asks for 5 candidates and keeps the highest `place_rank`, so an exact building beats a street centroid |
 | Road routing | yes | OSRM demo server, whole matrix in one request |
-| Live traffic | no | free-flow times × a Moscow congestion curve by hour (×1.26 at 13:00, ×1.70 at 18:20, damped at weekends) |
+| Live traffic | on the web, no | free-flow times × a Moscow congestion curve by hour (×1.26 at 13:00, ×1.70 at 18:20, damped at weekends) |
+| Live traffic | in the native shell, **yes and free** | `MKDirections.calculateETA()` via `native/plugin/AppleRoute.swift` — real travel times, no key, no quota |
 
 Optional keys for **TomTom** or **Yandex** switch to real traffic; when the
 provider returns traffic-aware durations the modelled curve turns itself off, so

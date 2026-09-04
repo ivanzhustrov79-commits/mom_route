@@ -70,7 +70,7 @@ function buildStops(date) {
 
 /* потолок «сколько ребёнок едет с мамой»: обычно из настроек, но planDay умеет
    пересчитать день без него — чтобы предложить маме выбор */
-let RIDE_CAP = null;
+let RIDE_CAP = null, PLAN_DK = null;
 /* У старших запас терпения свой, у малышей свой. 0 или пусто — без границы. */
 function rideCap(kidId) {
   if (RIDE_CAP != null) return RIDE_CAP;
@@ -219,13 +219,15 @@ function maybeWalk(t) {
 
 /* 5 ── the plan for one date ─────────────────────────────────────────── */
 function planDay(date = new Date(), opts = {}) {
+  PLAN_DK = dayKey(date);
   RIDE_CAP = opts.maxRide == null ? null : opts.maxRide;
   FORCE_PICK = opts.force || new Set();
   FORCE_SKIP = opts.skip  || new Set();
   FORCE_WALK = opts.onFoot || new Set();
   WAIT_OK = opts.waitOk || new Set();
   try { return planDayInner(date); }
-  finally { RIDE_CAP = null; FORCE_PICK = FORCE_SKIP = FORCE_WALK = WAIT_OK = new Set(); }
+  finally { RIDE_CAP = null; PLAN_DK = null;
+           FORCE_PICK = FORCE_SKIP = FORCE_WALK = WAIT_OK = new Set(); }
 }
 
 function planDayInner(date) {

@@ -403,7 +403,9 @@ function renderNow() {
     (edits ? `<button class="undo" data-act="day-reset">мои правки на сегодня: ${
       edits} — вернуть как было</button>` : '');
 
-  const src = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
+  const ap = appleCount();
+  const src = ap ? `Apple Карты, живые пробки (${ap})`
+    : { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
                estimate:'оценка по прямой', loading:'считаю маршруты…', idle:'' }[matStatus] || '';
   const sy = S.cache.syncedAt
     ? 'заметка: ' + new Date(S.cache.syncedAt).toLocaleString('ru-RU',
@@ -1188,6 +1190,14 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   measureBar();
   if (S.cfg.geo && isParent()) geoStart();
   nativeInit();                     // в нативной оболочке — локальные уведомления
+
+  /* Карты спрашиваем уже после того, как план построен: нас интересуют
+     только выбранные перегоны, а не весь перебор. */
+  const applePass = () => appleRefresh(plan()).then(n => {
+    if (n) { invalidate(); if (cur().v === 'now') renderNow(); }
+  }).catch(() => {});
+  applePass();
+  setInterval(applePass, 30 * 60000);
 
   checkAppUpdate();
 

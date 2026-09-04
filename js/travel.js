@@ -133,6 +133,17 @@ async function ensureMatrix(force) {
 /* minutes of driving from place A to B, departing at `atMin` on weekday `dow` */
 function drive(aId, bId, atMin, dow) {
   if (aId === bId) return 0;
+
+  /* Если про этот перегон в этот час есть ответ Apple Карт — он точнее
+     любой модели, и кривую загруженности к нему применять уже нельзя. */
+  const ap = S.cache.apple;
+  if (ap) {
+    const dk = (typeof PLAN_DK === 'string' && PLAN_DK) || dayKey();
+    const h = Math.floor(((atMin % 1440) + 1440) % 1440 / 60);
+    const v = ap[`${aId}>${bId}@${dk}@${h}`];
+    if (typeof v === 'number') return v;
+  }
+
   const m = S.cache.matrix, a = place(aId), b = place(bId);
   let base;
   if (m && m.ids && m.d) {
