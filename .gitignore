@@ -3,3 +3,8 @@
 schedule.json
 tools/build_schedule.js
 NOTES.local.md
+
+# ключи веб-пуша: закрытый ключ и локальные файлы wrangler
+worker/.vapid.json
+worker/.wrangler/
+node_modules/

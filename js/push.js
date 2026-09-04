@@ -6,7 +6,7 @@
    Открытый ключ ниже — публичный по своей природе, ему тут и место.
    Закрытый лежит в секретах Cloudflare, общий пароль — в настройках.   */
 
-const VAPID_PUBLIC = 'BOqz1IVrTZVGn1Pu4sbPbvyhhYU8ShdRtGw8MxOKNwDauuK0ZyEzGEklWYvI1zf1gNOs3B01hcGslMjCCaU__Js';
+const VAPID_PUBLIC = 'BGwyDgzyRf7sqTQSwMZOM0_hTI_iEDZCd662WIDPWI9n922fHbCqVJa7IqcPxQganLM1lyA31_K-bBGxAxSuBRU';
 
 const b64ToU8 = s => {
   const pad = '='.repeat((4 - s.length % 4) % 4);

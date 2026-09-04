@@ -14,7 +14,7 @@ id = "ЗАМЕНИТЬ_НА_ID_ИЗ_КОМАНДЫ_ВЫШЕ"
 
 # Открытый ключ не секрет — пусть лежит рядом.
 [vars]
-VAPID_PUBLIC = "ВСТАВИТЬ_ОТКРЫТЫЙ_КЛЮЧ"
+VAPID_PUBLIC = "BGwyDgzyRf7sqTQSwMZOM0_hTI_iEDZCd662WIDPWI9n922fHbCqVJa7IqcPxQganLM1lyA31_K-bBGxAxSuBRU"
 VAPID_SUBJECT = "mailto:ivan.zhustrov79@gmail.com"
 
 # Секреты сюда НЕ пишем. Они задаются командами:
