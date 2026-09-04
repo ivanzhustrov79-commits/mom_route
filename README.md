@@ -48,12 +48,18 @@ voice** with a tick and a cross:
 
 > Я предложил идти пешком — может, дети дойдут сами?  ✓ ✗
 
-The tick accepts and the question goes quiet for the day; the cross rebuilds the
-day the other way. Both answers are counted, so a repeated preference eventually
+Each question appears about ten minutes before the moment it has to be answered
+and goes quiet ten minutes after — a question you cannot act on yet is only noise
+on the one screen that should stay calm. The tick accepts and it goes quiet for
+the day; the cross rebuilds the day the other way. Both answers are counted, so a repeated preference eventually
 stops being asked. Everything decided by hand rolls back on one line at the foot
 of the day. The questions are: walk instead of collecting, drive instead of
 walking, wait out instead of coming home, and collect instead of letting them
 make their own way.
+
+If location is on and she simply drives to the next place during a free window,
+the app notices and moves the window there rather than asking about it — the
+decision was made by driving.
 
 Free windows appear in green with where you will be; children left to get home
 alone, and children left at home longer than their own limit, appear in amber.

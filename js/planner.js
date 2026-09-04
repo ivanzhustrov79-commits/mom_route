@@ -348,12 +348,13 @@ function spareBlocks(p, date = new Date(), minMin = 20) {
       const leave = a.arrive + a.service;
       const idle = b.arrive - leave - drive(a.placeId, b.placeId, leave, dow);
       if (idle >= minMin)
-        out.push({ from: leave, to: leave + idle, placeId: a.placeId,
+        out.push({ from: leave, to: leave + idle, placeId: a.placeId, next: b.placeId,
                    key: gapKey(a.placeId, b.placeId), away: true });
     }
     const nx = p.trips[i + 1];
     if (nx && nx.depart - t.home >= minMin)
       out.push({ from: t.home, to: nx.depart, placeId: home, away: false,
+                 next: nx.stops[0].placeId,
                  key: gapKey(t.stops[t.stops.length - 1].placeId, nx.stops[0].placeId) });
   }
   return out.sort((a, b) => a.from - b.from);

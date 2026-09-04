@@ -112,8 +112,13 @@ function dayOverrides() {
    На каждое событие — не больше одного вопроса, и только там, где у него
    правда есть вторая осмысленная развязка. Галочка значит «так и делай»,
    крестик — «нет» и сразу перестраивает день.                          */
-function propHtml(pr) {
+const PROP_WINDOW = 10;            // минут до и после момента решения
+
+function propHtml(pr, t = nowMin()) {
   if (!pr || ((S.cache.okProp || {})[dayKey()] || []).includes(pr.id)) return '';
+  /* Вопрос имеет смысл ровно тогда, когда на него можно ответить делом.
+     За час до и через час после это просто шум на экране.              */
+  if (pr.when != null && Math.abs(t - pr.when) > PROP_WINDOW) return '';
   return `<div class="prop"><span>${esc(pr.text)}</span>
       <span class="pb">
         <button data-act="prop-yes" data-id="${esc(pr.id)}" title="так и делаем">✓</button>
@@ -129,22 +134,24 @@ function tripProposal(t) {
 
   if (t.mode === 'walk' && picks.length)
     return { id: 'walk|' + acts.join(','), act: 'skip-pick', arg: acts.join(','),
+             when: t.depart,
              text: 'Я предложил идти пешком — может, дети дойдут сами?' };
 
   if (t.mode === 'car' && t.stops.length === 1 && t.stops[0].modes.includes('walk'))
     return { id: 'car|' + acts.join(','), act: 'on-foot', arg: acts.join(','),
+             when: t.depart,
              text: 'Я предложил ехать на машине — может, дойти пешком?' };
 
   return null;
 }
 
 const spareProposal = g => ({
-  id: 'gap|' + g.key, act: 'stay', arg: g.key,
+  id: 'gap|' + g.key, act: 'stay', arg: g.key, when: g.from,
   text: g.away ? 'Я предложил подождать на месте — может, съездить домой?'
                : 'Я предложил вернуться домой — может, подождать у следующего места?' });
 
 const aloneProposal = r => ({
-  id: 'alone|' + r.actIds.join(','), act: 'collect', arg: r.actIds.join(','),
+  id: 'alone|' + r.actIds.join(','), act: 'collect', arg: r.actIds.join(','), when: r.at,
   text: 'Я предложил, что доберутся сами — может, забрать?' });
 
 /* Долгая поездка с мамой — это не запрет, а вопрос. Считаем день дважды:
@@ -204,6 +211,30 @@ function markStep(key, field) {
   render();
 }
 
+/* Мама уехала ждать к следующему месту — значит, свободное окно уже не дома,
+   и спрашивать про это поздно. Переписываем решение по факту, а не по плану. */
+function geoAutoGap(p) {
+  if (!S.cfg.geo || !isParent() || !geoFresh()) return false;
+  const t = nowMin(), dk = dayKey();
+  const set = new Set((S.cache.stayOut || {})[dk] || []);
+  let moved = false;
+
+  for (const g of spareBlocks(p, new Date())) {
+    if (t < g.from - 5 || t > g.to) continue;           // окно не идёт сейчас
+    if (!g.away && !set.has(g.key) && nearPlace(g.next) === true) {
+      set.add(g.key); moved = true;                     // уже на месте — ждём там
+    } else if (g.away && set.has(g.key) && nearPlace(homePlace().id) === true) {
+      set.delete(g.key); moved = true;                  // всё-таки дома
+    }
+  }
+  if (!moved) return false;
+  S.cache.stayOut = S.cache.stayOut || {};
+  S.cache.stayOut[dk] = [...set];
+  pruneDays('stayOut');
+  save(); invalidate();
+  return true;
+}
+
 /* Если местоположение разрешено, отмечать шаги руками не нужно: уехали от
    точки отправления — значит выехали, оказались у цели — значит приехали.
    Кнопки остаются: они и подстраховка, и способ поправить.             */
@@ -243,7 +274,7 @@ function tripRow(x, now) {
         <span class="lbl">из дома${extra ? ' · ' + extra : ''}</span>
       </div>
       ${legsHtml(x)}
-      ${propHtml(tripProposal(x))}
+      ${propHtml(tripProposal(x), now == null ? undefined : now)}
     </div>`;
 }
 
@@ -257,7 +288,7 @@ function spareCard(g, t = nowMin()) {
         <span class="lbl">свободно ${started ? 'ещё ' : ''}${
           dur(g.to - Math.max(g.from, t))} · до ${m2hm(g.to)}</span></div>
       <div class="leg"><b></b><div><span>${esc(place(g.placeId)?.name || '')}</span></div></div>
-      ${propHtml(spareProposal(g))}
+      ${propHtml(spareProposal(g), t)}
     </div>`;
 }
 
@@ -1208,6 +1239,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
     if (document.visibilityState !== 'visible') return;
     if (planDK !== dayKey()) invalidate();
     geoAutoStep(plan());
+    geoAutoGap(plan());
     checkAlerts(plan());
     if (cur().v === 'now') renderNow();
     checkAppUpdate();
@@ -1231,6 +1263,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   setInterval(() => {
     if (planDK !== dayKey()) invalidate();
     geoAutoStep(plan());
+    geoAutoGap(plan());
     checkAlerts(plan());
     if (cur().v === 'now') renderNow();
   }, 10000);
