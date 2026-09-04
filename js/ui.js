@@ -500,9 +500,6 @@ function renderWeek() {
   }
   $('#week').innerHTML = out.join('');
   $('#fab').hidden = !isParent();
-  $('#kid-strip').innerHTML = !isParent() ? '' : S.kids.map(k =>
-    `<button class="row" data-go="kid" data-id="${k.id}">${kidLabel(k)}<i>${
-      k.activities.length} зан.</i></button>`).join('');
 }
 
 /* ── РЕДАКТОР ЗАНЯТИЯ ──────────────────────────────────────────────── */
@@ -632,6 +629,12 @@ function renderAssume() {
 
 /* ── НАСТРОЙКИ — только техника ────────────────────────────────────── */
 function renderSettings() {
+  $('#kid-list').innerHTML = S.kids.map(k =>
+    `<button class="row two" data-go="kid" data-id="${k.id}">
+       <span class="n">${kidLabel(k)}</span>
+       <span class="s">${k.activities.length} зан. · дома один ${
+         k.maxAlone ? dur(k.maxAlone) : 'нельзя'} · в машине ${
+         k.maxRide ? dur(k.maxRide) : 'без границы'}</span></button>`).join('');
   $('#place-list').innerHTML = S.places.map(p =>
     `<button class="row" data-go="place" data-id="${p.id}">${esc(p.name)}${
       p.home ? '<span class="badge">дом</span>' : ''}<i>${p.approx ? '≈ ' : ''}${
@@ -1001,14 +1004,6 @@ document.addEventListener('click', async e => {
   }
 
   /* — дети — */
-  if (act === 'add-kid') {
-    const k = { id: uid('k_'), name:'Новый', icon:'🙂', activities: [] };
-    S.kids.push(k); save(); return go('kid', k.id);
-  }
-  if (act === 'del-kid') {
-    S.kids = S.kids.filter(k => k.id !== cur().p); save(); invalidate(); return back();
-  }
-
   /* — адреса — */
   if (act === 'add-place') {
     const p = { id: uid('p_'), name:'Новый адрес', address:'',

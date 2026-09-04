@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 <title>Успеваем</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=202609041202">
+<link rel="stylesheet" href="style.css?v=202609041205">
 </head>
 <body>
 
@@ -67,9 +67,6 @@
       <button class="row" data-act="add-weekly">Занятие каждую неделю</button>
       <button class="row add" data-act="add-cancel">Отмена</button>
     </div>
-    <div class="cap sec">Дети</div>
-    <div id="kid-strip" class="list"></div>
-    <button class="row add" data-act="add-kid">+ ребёнок</button>
   </section>
 
   <!-- ───────────────────────── CLASS ───────────────────────── -->
@@ -88,6 +85,9 @@
 
   <!-- ───────────────────────── SETTINGS ───────────────────────── -->
   <section id="v-settings" class="view" hidden>
+    <div class="cap sec">Дети</div>
+    <div id="kid-list" class="list"></div>
+
     <div class="cap sec">Адреса</div>
     <div id="place-list" class="list"></div>
     <button class="row add" data-act="add-place">+ адрес</button>
@@ -123,7 +123,6 @@
   <!-- ───────────────────────── KID ───────────────────────── -->
   <section id="v-kid" class="view" hidden>
     <div id="kid-form"></div>
-    <button class="row danger" data-act="del-kid">Удалить ребёнка</button>
   </section>
 
   <!-- ───────────────────────── PLACE ───────────────────────── -->
@@ -147,17 +146,17 @@
 
 </div>
 
-<script src="js/state.js?v=202609041202"></script>
-<script src="js/travel.js?v=202609041202"></script>
-<script src="js/planner.js?v=202609041202"></script>
-<script src="js/where.js?v=202609041202"></script>
-<script src="js/notes.js?v=202609041202"></script>
-<script src="js/remark.js?v=202609041202"></script>
-<script src="js/secret.js?v=202609041202"></script>
-<script src="js/idb.js?v=202609041202"></script>
-<script src="js/push.js?v=202609041202"></script>
-<script src="js/native.js?v=202609041202"></script>
-<script src="js/notify.js?v=202609041202"></script>
-<script src="js/ui.js?v=202609041202"></script>
+<script src="js/state.js?v=202609041205"></script>
+<script src="js/travel.js?v=202609041205"></script>
+<script src="js/planner.js?v=202609041205"></script>
+<script src="js/where.js?v=202609041205"></script>
+<script src="js/notes.js?v=202609041205"></script>
+<script src="js/remark.js?v=202609041205"></script>
+<script src="js/secret.js?v=202609041205"></script>
+<script src="js/idb.js?v=202609041205"></script>
+<script src="js/push.js?v=202609041205"></script>
+<script src="js/native.js?v=202609041205"></script>
+<script src="js/notify.js?v=202609041205"></script>
+<script src="js/ui.js?v=202609041205"></script>
 </body>
 </html>

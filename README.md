@@ -61,10 +61,8 @@ alone, and children left at home longer than their own limit, appear in amber.
 **`Календарь`** (calendar icon) is the timetable — seven days of classes, no
 driving. Overlapping classes step to the right so a clash reads as a clash. Tap
 a class to edit its name, teacher, place, days, times, who attends and how the
-drop-off and pick-up work. One **+** offers a weekly class or a one-off event.
-Children live at the foot of this screen, each with an emoji, a limit on being
-home alone and a limit on time in the car. A class shared by several children is
-one row and edits reach all of them. Anything the app had to guess sits on the
+drop-off and pick-up work. One **+** offers a weekly class or a one-off event. A class shared by several
+children is one row and edits reach all of them. Anything the app had to guess sits on the
 event it belongs to, not in a list somewhere else.
 
 **Пожелания** — each class takes a free-text remark, read by a small local
@@ -74,7 +72,8 @@ what it understood rather than changing things silently, and needs no network
 and no model.
 
 **`Настройки`** (from inside the calendar, one level deeper) is technical only —
-addresses, planner limits, routing source, notifications, data. Addresses are
+children (name, emoji, how long alone at home, how long in the car), addresses,
+planner limits, routing source, notifications, data. Addresses are
 typed however you like and picked from what OpenStreetMap finds, each candidate
 saying whether it is an exact building.
 
