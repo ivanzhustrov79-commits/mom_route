@@ -10,7 +10,7 @@ crons = ["* * * * *"]
 #   npx wrangler kv namespace create PUSHQ
 [[kv_namespaces]]
 binding = "PUSHQ"
-id = "ЗАМЕНИТЬ_НА_ID_ИЗ_КОМАНДЫ_ВЫШЕ"
+id = "0a5d575123c4440999b1d6de8b89af43"
 
 # Открытый ключ не секрет — пусть лежит рядом.
 [vars]
