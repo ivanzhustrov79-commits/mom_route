@@ -12,38 +12,47 @@ browser and all data stays in `localStorage` on the device.
 
 ## Screens
 
-**`Сегодня`** opens on one thing only: the countdown to the next departure and
-that outing written out in full — every stop, who is dropped or collected, and
-the time everyone is home again. It fills the screen; the rest of the day is one
-scroll below. The teacher's name appears here and nowhere else, because it is
-only worth knowing for the event you are about to drive to.
+**`Сегодня`** shows one movement at a time — one drive or one walk, never the
+whole outing — under a countdown that turns into «В пути, приедем через …» once
+you have set off. The teacher's name appears here and nowhere else, because it
+only matters for the thing you are about to drive to. The rest of the day
+follows immediately underneath, with no reserved blank space, filtered to what
+is still ahead.
 
-Below the fold the day runs as a single strip, in time order:
+Every card that has a real second option carries **one question in the app's own
+voice** with a tick and a cross:
 
-* **outings** — a walking or car glyph, departure from home, each stop, back home;
-* **free windows** in green — how long, until when, and where you are. Tapping one
-  switches between waiting at home and waiting at the next place; if that would
-  leave a child sitting in the car past the limit, the app says so and puts it
-  back rather than silently doing nothing;
-* **children getting home on their own**, in amber with a warning glyph. Tapping
-  turns it into a pick-up for that day, and one line at the foot of the day undoes
-  it. The check is per child: if nobody in the plan collects them from their last
-  class of the day, it says so.
+> Я предложил идти пешком — может, дети дойдут сами?  ✓ ✗
+
+The tick accepts and the question goes quiet for the day; the cross rebuilds the
+day the other way. Both answers are counted, so a repeated preference eventually
+stops being asked. Everything decided by hand rolls back on one line at the foot
+of the day. The questions are: walk instead of collecting, drive instead of
+walking, wait out instead of coming home, and collect instead of letting them
+make their own way.
+
+Free windows appear in green with where you will be; children left to get home
+alone, and children left at home longer than their own limit, appear in amber.
 
 **`Календарь`** (calendar icon) is the timetable — seven days of classes, no
-driving. Overlapping classes step to the right so a clash is visible instead of
-reading as one-after-another. Tap a class to edit its name, teacher, place, days,
-times, who attends and how the drop-off and pick-up work; every class is weekly.
-`+ занятие` adds one to that day, and children live at the bottom of this screen.
-A class shared by several children is one row and edits reach all of them.
+driving. Overlapping classes step to the right so a clash reads as a clash. Tap
+a class to edit its name, teacher, place, days, times, who attends and how the
+drop-off and pick-up work. One **+** offers a weekly class or a one-off event.
+Children live at the foot of this screen, each with an emoji, a limit on being
+home alone and a limit on time in the car. A class shared by several children is
+one row and edits reach all of them. Anything the app had to guess sits on the
+event it belongs to, not in a list somewhere else.
+
+**Пожелания** — each class takes a free-text remark, read by a small local
+parser: «приезжать за 20 минут до начала» sets the lead time, «не позже 18:40»
+the pick-up window, «сами дойдут» clears the must-collect flag. It prints back
+what it understood rather than changing things silently, and needs no network
+and no model.
 
 **`Настройки`** (from inside the calendar, one level deeper) is technical only —
-addresses, planner limits, routing source, notifications, data. Nothing the
-driver needs day to day.
-
-There is also a rough parser for schedules pasted as text
-(`Настройки → Импорт расписания`), and JSON import/export for moving a finished
-setup between devices.
+addresses, planner limits, routing source, notifications, data. Addresses are
+typed however you like and picked from what OpenStreetMap finds, each candidate
+saying whether it is an exact building.
 
 ## How the planner works
 
@@ -70,7 +79,8 @@ Constraints that keep it realistic:
 |---|---|
 | `Мест в машине` | seat limit; children being dropped off occupy seats from home, collected ones from their stop onwards |
 | `Максимум ожидания` | idle longer than this between two stops and going home is cheaper — the outing splits |
-| `Ребёнок в машине не дольше` | caps how long any child is carried around on one outing |
+| `В машине не дольше` | per child — unlimited for the older ones, two hours for the little ones. An outing is rejected only when it exceeds the limit of the child actually sitting in it |
+| `Один дома не дольше` | per child; a longer unattended stretch shows as a warning |
 | `Штраф за пропуск` | optional pick-ups (children who *can* walk home) may be dropped if collecting them needs a whole extra outing |
 | `Парковка и подход` | the friction that decides walk vs. drive for a short single errand |
 | `Пешком не дальше` | walking cut-off |
@@ -81,11 +91,11 @@ A long ride-along is a judgement call, not a rule. The app plans the day twice �
 once respecting the ride cap, once ignoring it — and if dropping the cap would
 save outings it asks, rather than deciding:
 
-> Можно обойтись **на 3 выезда меньше**, если Аня поедет кататься с мамой —
+> Можно обойтись **на 3 выезда меньше**, если Ксю поедет кататься с мамой —
 > 2 ч 18 м в машине.  **Да, поедет** · **Нет, домой**
 
-The answer is remembered for that day only. Nothing is asked when there is
-nothing to gain.
+The answer is remembered for that day only, and after the same answer three
+times it stops asking. Nothing is asked when there is nothing to gain.
 
 ### When the schedule doesn't fit
 
