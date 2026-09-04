@@ -75,9 +75,50 @@ const namesOf = ids => ids.map(i => { const k = kid(i); return k ? kidLabel(k) :
 /* ── план на сегодня ───────────────────────────────────────────────── */
 function dayOverrides() {
   const dk = dayKey();
-  return { force:  new Set((S.cache.pickUp  || {})[dk] || []),
-           waitOk: new Set((S.cache.stayOut || {})[dk] || []) };
+  return { force:  new Set((S.cache.pickUp   || {})[dk] || []),
+           skip:   new Set((S.cache.skipPick || {})[dk] || []),
+           onFoot: new Set((S.cache.onFoot   || {})[dk] || []),
+           waitOk: new Set((S.cache.stayOut  || {})[dk] || []) };
 }
+
+/* ── предложения ──────────────────────────────────────────────────────
+   На каждое событие — не больше одного вопроса, и только там, где у него
+   правда есть вторая осмысленная развязка. Галочка значит «так и делай»,
+   крестик — «нет» и сразу перестраивает день.                          */
+function propHtml(pr) {
+  if (!pr || ((S.cache.okProp || {})[dayKey()] || []).includes(pr.id)) return '';
+  return `<div class="prop"><span>${esc(pr.text)}</span>
+      <span class="pb">
+        <button data-act="prop-yes" data-id="${esc(pr.id)}" title="так и делаем">✓</button>
+        <button data-act="prop-no" data-id="${esc(pr.id)}"
+                data-do="${pr.act}" data-arg="${esc(pr.arg)}" title="нет, иначе">✗</button>
+      </span></div>`;
+}
+
+function tripProposal(t) {
+  const acts = [...new Set(t.stops.flatMap(s => s.actIds || []))];
+  const picks = t.stops.filter(s => s.kind === 'pick');
+  if (!acts.length) return null;
+
+  if (t.mode === 'walk' && picks.length)
+    return { id: 'walk|' + acts.join(','), act: 'skip-pick', arg: acts.join(','),
+             text: 'Я предложил идти пешком — может, дети дойдут сами?' };
+
+  if (t.mode === 'car' && t.stops.length === 1 && t.stops[0].modes.includes('walk'))
+    return { id: 'car|' + acts.join(','), act: 'on-foot', arg: acts.join(','),
+             text: 'Я предложил ехать на машине — может, дойти пешком?' };
+
+  return null;
+}
+
+const spareProposal = g => ({
+  id: 'gap|' + g.key, act: 'stay', arg: g.key,
+  text: g.away ? 'Я предложил подождать на месте — может, съездить домой?'
+               : 'Я предложил вернуться домой — может, подождать у следующего места?' });
+
+const aloneProposal = r => ({
+  id: 'alone|' + r.actIds.join(','), act: 'collect', arg: r.actIds.join(','),
+  text: 'Я предложил, что доберутся сами — может, забрать?' });
 
 /* Долгая поездка с мамой — это не запрет, а вопрос. Считаем день дважды:
    строго по настройке и без потолка. Если без потолка выездов меньше —
@@ -136,29 +177,30 @@ function tripRow(x, now) {
         <span class="lbl">из дома${extra ? ' · ' + extra : ''}</span>
       </div>
       ${legsHtml(x)}
+      ${propHtml(tripProposal(x))}
     </div>`;
 }
 
 /* свободное окно: где мама и до какого часа. Нажатие меняет место. */
 function spareCard(g) {
-  return `<button class="trip spare" data-act="stay" data-key="${esc(g.key)}">
+  return `<div class="trip spare">
       <div class="th"><span class="t">${m2hm(g.from)}</span>
         <span class="lbl">свободно ${dur(g.to - g.from)} · до ${m2hm(g.to)}</span></div>
-      <div class="leg"><b></b><div><span>${esc(place(g.placeId)?.name || '')}</span>
-        <i>${g.away ? 'ждём на месте — нажмите, чтобы вернуться домой'
-                    : 'дома — нажмите, чтобы ждать у следующего места'}</i></div></div>
-    </button>`;
+      <div class="leg"><b></b><div><span>${esc(place(g.placeId)?.name || '')}</span></div></div>
+      ${propHtml(spareProposal(g))}
+    </div>`;
 }
 
 /* ребёнок добирается домой сам — это всегда решение, а не мелочь */
 function aloneCard(r) {
-  return `<button class="trip alone" data-act="pick-self" data-key="${esc(r.actIds.join(','))}">
+  return `<div class="trip alone">
       <div class="th"><span class="t">${m2hm(r.at)}</span>
         <span class="ic">${ICON.warn}</span>
         <span class="lbl">${esc(place(r.placeId)?.name || '')} — домой сами</span></div>
       <div class="leg"><b></b><div><span>${r.kids.map(kidLabel).join(', ')}</span>
-        <i>после «${esc(r.title)}» · нажмите — заберу сама</i></div></div>
-    </button>`;
+        <i>после «${esc(r.title)}»</i></div></div>
+      ${propHtml(aloneProposal(r))}
+    </div>`;
 }
 
 /* ребёнок остаётся дома один дольше, чем ему можно */
@@ -219,8 +261,6 @@ function renderNow() {
       `<div class="legs">${body}</div>`;
   }
 
-  const ahead = p.trips.filter(x => x.home > t - 3).length;
-  $('#hero-more').textContent = ahead ? 'дальше сегодня ↓' : '';
 
   const cf = dayConflicts(new Date());
   const wn = $('#warn');
@@ -251,10 +291,15 @@ function renderNow() {
   for (const r of aloneAtHome(p, new Date())) if (r.to > t) items.push({ at: r.from, html: aloneCardHome(r) });
   items.sort((a, b) => a.at - b.at);
 
-  const forced = ((S.cache.pickUp || {})[dayKey()] || []).length;
+  /* всё, что мама сегодня решила вручную, откатывается одной строкой */
+  const dk = dayKey();
+  const edits = ['pickUp', 'skipPick', 'onFoot', 'stayOut', 'okProp']
+    .reduce((n, b) => n + (((S.cache[b] || {})[dk] || []).length), 0)
+    + (((S.cache.rideOk || {})[dk] === undefined) ? 0 : 1);
   $('#trips').innerHTML = items.map(i => i.html).join('') +
     (FLASH ? `<div class="flash">${esc(FLASH)}</div>` : '') +
-    (forced ? `<button class="undo" data-act="pick-reset">забираю сама: ${forced} — вернуть как было</button>` : '');
+    (edits ? `<button class="undo" data-act="day-reset">мои правки на сегодня: ${
+      edits} — вернуть как было</button>` : '');
 
   const src = { live:'Яндекс, с пробками', route:'OSRM + модель пробок',
                estimate:'оценка по прямой', loading:'считаю маршруты…', idle:'' }[matStatus] || '';
@@ -600,6 +645,40 @@ async function checkAppUpdate() {
 }
 
 /* ── решения мамы на сегодня ───────────────────────────────────────── */
+function pruneDays(bucket) {
+  const old = dayKey(new Date(Date.now() - 3 * 864e5));
+  for (const k of Object.keys(S.cache[bucket] || {})) if (k < old) delete S.cache[bucket][k];
+}
+
+function toggleIds(bucket, ids) {
+  const dk = dayKey();
+  S.cache[bucket] = S.cache[bucket] || {};
+  const set = new Set(S.cache[bucket][dk] || []);
+  ids.every(i => set.has(i)) ? ids.forEach(i => set.delete(i)) : ids.forEach(i => set.add(i));
+  S.cache[bucket][dk] = [...set];
+  pruneDays(bucket);
+}
+
+/* «подожду на месте» имеет смысл, только если выездов станет меньше.
+   Если детям пришлось бы сидеть в машине дольше разрешённого — откат. */
+function toggleStay(key) {
+  const dk = dayKey();
+  const before = plan().trips.length;
+  S.cache.stayOut = S.cache.stayOut || {};
+  const set = new Set(S.cache.stayOut[dk] || []);
+  const adding = !set.has(key);
+  adding ? set.add(key) : set.delete(key);
+  S.cache.stayOut[dk] = [...set];
+  invalidate();
+  if (adding && plan().trips.length >= before) {
+    set.delete(key); S.cache.stayOut[dk] = [...set]; invalidate();
+    FLASH = 'Ждать на месте не получится: кто-то из детей просидел бы в машине ' +
+            'дольше, чем разрешено в настройках.';
+  } else FLASH = '';
+  pruneDays('stayOut');
+  save(); render();
+}
+
 function toggleDay(bucket, key) {
   const dk = dayKey();
   S.cache[bucket] = S.cache[bucket] || {};
@@ -637,26 +716,31 @@ document.addEventListener('click', async e => {
   if (!act) return;
 
   /* — сегодняшние решения — */
-  if (act === 'stay') {
-    /* «подожду на месте» имеет смысл, только если выездов станет меньше.
-       Если детям пришлось бы сидеть в машине дольше разрешённого — откат. */
-    const dk = dayKey(), key = b.dataset.key;
-    const before = plan().trips.length;
-    S.cache.stayOut = S.cache.stayOut || {};
-    const set = new Set(S.cache.stayOut[dk] || []);
-    const adding = !set.has(key);
-    adding ? set.add(key) : set.delete(key);
-    S.cache.stayOut[dk] = [...set];
-    invalidate();
-    if (adding && plan().trips.length >= before) {
-      set.delete(key); S.cache.stayOut[dk] = [...set]; invalidate();
-      FLASH = 'Ждать на месте не получится: кто-то из детей просидел бы в машине ' +
-              'дольше, чем разрешено в настройках.';
-    } else FLASH = '';
-    const old = dayKey(new Date(Date.now() - 3 * 864e5));
-    for (const k of Object.keys(S.cache.stayOut)) if (k < old) delete S.cache.stayOut[k];
-    save(); return render();
+  if (act === 'prop-yes') {                       // «так и делай»
+    const dk = dayKey();
+    S.cache.okProp = S.cache.okProp || {};
+    S.cache.okProp[dk] = [...new Set([...(S.cache.okProp[dk] || []), b.dataset.id])];
+    S.cache.learn = S.cache.learn || {};
+    const kind = b.dataset.id.split('|')[0];
+    const L = S.cache.learn[kind] || (S.cache.learn[kind] = { yes:0, no:0 });
+    L.yes++;
+    pruneDays('okProp'); save(); return render();
   }
+  if (act === 'prop-no') {                        // «нет, иначе» — сразу перестраиваем
+    const kind = b.dataset.id.split('|')[0];
+    S.cache.learn = S.cache.learn || {};
+    const L = S.cache.learn[kind] || (S.cache.learn[kind] = { yes:0, no:0 });
+    L.no++;
+    const arg = b.dataset.arg, ids = arg.split(',').filter(Boolean);
+    if (b.dataset.do === 'skip-pick') toggleIds('skipPick', ids);
+    if (b.dataset.do === 'on-foot')   toggleIds('onFoot',  ids);
+    if (b.dataset.do === 'collect')   toggleIds('pickUp',  ids);
+    if (b.dataset.do === 'stay')      return toggleStay(arg);
+    save(); invalidate(); return render();
+  }
+
+  if (act === 'stay') return toggleStay(b.dataset.key);
+
   if (act === 'pick-self') {                    // ключ — список id занятий
     FLASH = '';
     const dk = dayKey();
@@ -669,9 +753,12 @@ document.addEventListener('click', async e => {
     for (const k of Object.keys(S.cache.pickUp)) if (k < old) delete S.cache.pickUp[k];
     save(); invalidate(); return render();
   }
-  if (act === 'pick-reset') {
-    (S.cache.pickUp || {})[dayKey()] = [];
-    save(); invalidate(); return render();
+  if (act === 'day-reset') {
+    const dk = dayKey();
+    for (const bkt of ['pickUp', 'skipPick', 'onFoot', 'stayOut', 'okProp'])
+      if (S.cache[bkt]) delete S.cache[bkt][dk];
+    if (S.cache.rideOk) delete S.cache.rideOk[dk];
+    FLASH = ''; save(); invalidate(); return render();
   }
   if (act === 'ride-yes' || act === 'ride-no') {
     const dk = dayKey();
@@ -876,10 +963,21 @@ addEventListener('scroll', () => {
   document.body.classList.toggle('scrolled', scrollY > 4);
 }, { passive: true });
 
+/* На айфоне высота шапки зависит от «чёлки» и от того, свёрнута ли адресная
+   строка. Меряем её и отдаём в CSS, иначе заголовки дней липнут не туда. */
+function measureBar() {
+  const h = Math.round($('#bar').getBoundingClientRect().height);
+  document.documentElement.style.setProperty('--bartop', h + 'px');
+}
+addEventListener('resize', measureBar);
+addEventListener('orientationchange', () => setTimeout(measureBar, 250));
+if (window.visualViewport) visualViewport.addEventListener('resize', measureBar);
+
 /* ── старт ─────────────────────────────────────────────────────────── */
 (async function boot() {
   if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
   render();
+  measureBar();
 
   checkAppUpdate();
 

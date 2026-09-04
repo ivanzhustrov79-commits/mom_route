@@ -6,7 +6,7 @@
 /* Решения мамы на конкретный день, влияющие на план:
    FORCE_PICK — «этих забираю сама», даже если по расписанию они сами;
    WAIT_OK    — «подожду на месте», не возвращаясь домой между заездами. */
-let FORCE_PICK = new Set(), WAIT_OK = new Set();
+let FORCE_PICK = new Set(), FORCE_SKIP = new Set(), FORCE_WALK = new Set(), WAIT_OK = new Set();
 const gapKey = (a, b) => `${a}>${b}`;
 
 /* Занятие идёт в этот день? Разовое событие живёт только своей датой. */
@@ -30,14 +30,16 @@ function buildStops(date) {
     const freeFrom = prev.length ? Math.max(...prev) + 10 : -Infinity;
     if (a.drop && a.drop.on) {
       const by = a.start - (a.drop.leadMin || 0);
-      out.push({ kind:'drop', placeId:a.placeId, kidIds:[k.id], title:a.title, teacher:a.teacher,
+      out.push({ kind:'drop', placeId:a.placeId, kidIds:[k.id], actIds:[a.id],
+                 title:a.title, teacher:a.teacher,
                  w0: Math.min(by, Math.max(by - 30, freeFrom)), w1: by,
                  service:a.drop.leadMin || 0,
                  must:true, modes:a.drop.modes || ['car'] });
     }
     const forced = FORCE_PICK.has(a.id);          // «сегодня забираю сама»
-    if (a.pick && (a.pick.on || forced)) {
-      out.push({ kind:'pick', placeId:a.placeId, kidIds:[k.id], title:a.title, teacher:a.teacher,
+    if (a.pick && (a.pick.on || forced) && !FORCE_SKIP.has(a.id)) {
+      out.push({ kind:'pick', placeId:a.placeId, kidIds:[k.id], actIds:[a.id],
+                 title:a.title, teacher:a.teacher,
                  w0: a.pick.on ? a.pick.earliest : a.end,
                  w1: a.pick.on ? a.pick.latest   : a.end + 20,
                  service:a.pick.serviceMin || 5,
@@ -52,6 +54,7 @@ function buildStops(date) {
                                s.w0 <= x.w1 && x.w0 <= s.w1);
     if (m) {
       m.kidIds = [...new Set([...m.kidIds, ...s.kidIds])];   // never count a kid twice
+      m.actIds = [...new Set([...m.actIds, ...s.actIds])];
       m.w0 = Math.max(m.w0, s.w0); m.w1 = Math.min(m.w1, s.w1);
       m.service = Math.max(m.service, s.service);
       m.must = m.must || s.must;
@@ -59,7 +62,7 @@ function buildStops(date) {
       if (m.title !== s.title) m.title = m.title + ' / ' + s.title;
       if (s.teacher && m.teacher !== s.teacher)
         m.teacher = [m.teacher, s.teacher].filter(Boolean).join(', ');
-    } else merged.push({ ...s, kidIds:[...s.kidIds] });
+    } else merged.push({ ...s, kidIds:[...s.kidIds], actIds:[...s.actIds] });
   }
   merged.sort((a, b) => (a.w0 - b.w0) || (a.w1 - b.w1));
   return merged;
@@ -194,10 +197,12 @@ function maybeWalk(t) {
   const s = t.stops[0];
   if (!s.modes.includes('walk')) return t;
   const w = walk(homePlace().id, s.placeId);
-  if (!t.walkOnly) {
+  const asked = (s.actIds || []).some(id => FORCE_WALK.has(id));   // «пойду пешком»
+  if (!t.walkOnly && !asked) {
     if (w > S.cfg.walkMaxMin) return t;
     if (2 * w > t.driveMin + S.cfg.parkFriction) return t;   // round trip vs round trip
   }
+  if (asked && w > S.cfg.walkMaxMin * 2) return t;
   return { ...t, mode:'walk', depart: s.arrive - w, driveMin: 0, walkMin: 2 * w,
            back: w, home: s.arrive + s.service + w };
 }
@@ -206,9 +211,11 @@ function maybeWalk(t) {
 function planDay(date = new Date(), opts = {}) {
   RIDE_CAP = opts.maxRide == null ? null : opts.maxRide;
   FORCE_PICK = opts.force || new Set();
+  FORCE_SKIP = opts.skip  || new Set();
+  FORCE_WALK = opts.onFoot || new Set();
   WAIT_OK = opts.waitOk || new Set();
   try { return planDayInner(date); }
-  finally { RIDE_CAP = null; FORCE_PICK = new Set(); WAIT_OK = new Set(); }
+  finally { RIDE_CAP = null; FORCE_PICK = FORCE_SKIP = FORCE_WALK = WAIT_OK = new Set(); }
 }
 
 function planDayInner(date) {

@@ -60,7 +60,7 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #vault-msg.bad{color:var(--hot)}
 
 /* week */
-.wd{position:sticky;top:calc(58px + env(safe-area-inset-top));z-index:10;
+.wd{position:sticky;top:var(--bartop, 58px);z-index:10;
      margin:38px 0 0;padding:10px 0 12px;background:var(--bg);
      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
 .wd.today{color:var(--ink)}
@@ -81,6 +81,17 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .cls i{display:block;font-style:normal;font-size:12px;color:var(--mut);margin-top:3px;line-height:1.45}
 .wempty{padding:14px 0;border-top:1px solid var(--line);font-size:14px;color:var(--mut)}
 .wconf{padding:12px 0;border-top:1px solid var(--hot);font-size:13px;color:var(--hot);line-height:1.5}
+
+/* предложение приложения прямо на карточке */
+.prop{display:flex;align-items:flex-start;gap:12px;margin-top:12px;padding-top:11px;
+      border-top:1px dashed var(--line)}
+.prop span{font-size:12px;line-height:1.5;color:var(--mut)}
+.prop .pb{display:flex;gap:6px;margin-left:auto;flex:none}
+.prop .pb button{background:none;border:1px solid var(--line);border-radius:7px;
+      width:32px;height:30px;font:inherit;font-size:14px;line-height:1;cursor:pointer;color:var(--mut)}
+.prop .pb button:first-child{color:var(--free)}
+.prop .pb button:last-child{color:var(--hot)}
+.prop .pb button:active{opacity:.5}
 
 /* одна кнопка «плюс» на календаре */
 #fab{position:fixed;right:calc(50% - 230px + 22px);bottom:26px;z-index:30;
