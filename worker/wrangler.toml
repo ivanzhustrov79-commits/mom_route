@@ -2,6 +2,11 @@ name = "momroute-push"
 main = "index.js"
 compatibility_date = "2026-01-01"
 
+# Публичный адрес нужен — телефон ходит именно на него.
+# А вот отдельные preview-адреса лишние: чем меньше дверей, тем лучше.
+workers_dev = true
+preview_urls = false
+
 # Раз в минуту воркер смотрит, кого пора будить.
 [triggers]
 crons = ["* * * * *"]
