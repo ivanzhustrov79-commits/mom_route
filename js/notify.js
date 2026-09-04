@@ -44,20 +44,24 @@ function tripLine(t) {
   return dest + (who ? ' · ' + who : '');
 }
 
-/* called on every tick with the current plan */
+/* Вызывается на каждом тике и при каждом открытии приложения.
+   Окно не «две минуты в момент срабатывания», а «порог уже пройден, а выезд
+   ещё нет» — иначе всё, что случилось, пока приложение было закрыто, немо
+   пропадало. Заодно это делает рабочим сценарий с автоматизацией Быстрых
+   команд: открыли приложение — и оно тут же досказало пропущенное.        */
 function checkAlerts(plan) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const t = nowMin();
   for (const trip of plan.trips) {
+    if (t >= trip.depart + 2) continue;                  // уже уехали
     for (const a of S.cfg.alerts) {
-      const at = trip.depart - a;
-      if (t >= at && t < at + 2) {                       // 2-minute catch window
-        if (!markFired(trip.id + '@' + a)) continue;
-        const verb = trip.mode === 'walk' ? 'выходить' : 'выезжать';
-        fire(a === 0 ? 'Пора ' + verb : `Через ${a} мин — ${verb}`,
-             tripLine(trip) + ' · к ' + m2hm(trip.stops[0].arrive),
-             trip.id);
-      }
+      if (t < trip.depart - a) continue;                 // ещё рано
+      if (!markFired(trip.id + '@' + a)) continue;       // уже говорили
+      const left = Math.round(trip.depart - t);
+      const verb = trip.mode === 'walk' ? 'выходить' : 'выезжать';
+      fire(left <= 0 ? 'Пора ' + verb : `Через ${left} мин — ${verb}`,
+           tripLine(trip) + ' · к ' + m2hm(trip.stops[0].arrive),
+           trip.id);
     }
   }
 }
