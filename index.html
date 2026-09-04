@@ -52,6 +52,12 @@
   <!-- ───────────────────────── WEEK ───────────────────────── -->
   <section id="v-week" class="view" hidden>
     <div id="week"></div>
+    <button id="fab" data-act="add-menu">+</button>
+    <div id="add-menu" hidden>
+      <button class="row" data-act="add-once">Разовое событие</button>
+      <button class="row" data-act="add-weekly">Занятие каждую неделю</button>
+      <button class="row add" data-act="add-cancel">Отмена</button>
+    </div>
     <div class="cap sec">Дети</div>
     <div id="kid-strip" class="list"></div>
     <button class="row add" data-act="add-kid">+ ребёнок</button>
@@ -133,6 +139,7 @@
 <script src="js/travel.js"></script>
 <script src="js/planner.js"></script>
 <script src="js/notes.js"></script>
+<script src="js/remark.js"></script>
 <script src="js/secret.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/ui.js"></script>

@@ -8,6 +8,7 @@ let WEEKROWS = [];                 // строки календаря текущ
 let FLASH = '';                    // короткое пояснение к последнему действию
 let VAULT_NEW = false;             // в репозитории лежит расписание свежее нашего
 let EDITING = { refs: [] };        // какие занятия правит открытый редактор
+let WEEKDATE = new Date();         // с какого дня показан календарь
 
 /* ── field binding ─────────────────────────────────────────────────── */
 let BIND = {}, bn = 0;
@@ -94,8 +95,13 @@ function buildPlan() {
   if (said === true) return long ? { ...loose, longRide: worst } : strict;
 
   const saved = strict.trips.length - loose.trips.length;
-  if (saved > 0 && long)
+  if (saved > 0 && long) {
+    /* если один и тот же ответ повторился трижды — больше не спрашиваем */
+    const L = (S.cache.learn || {})[worst.rideKid] || { yes:0, no:0 };
+    if (L.yes >= 3 && L.no === 0) return { ...loose, longRide: worst, learned:'yes' };
+    if (L.no  >= 3 && L.yes === 0) return { ...strict, learned:'no' };
     return { ...strict, offer: { saved, ride: worst.ride, kid: kid(worst.rideKid) } };
+  }
   return strict;
 }
 
@@ -153,6 +159,17 @@ function aloneCard(r) {
       <div class="leg"><b></b><div><span>${r.kids.map(kidLabel).join(', ')}</span>
         <i>после «${esc(r.title)}» · нажмите — заберу сама</i></div></div>
     </button>`;
+}
+
+/* ребёнок остаётся дома один дольше, чем ему можно */
+function aloneCardHome(r) {
+  return `<div class="trip alone">
+      <div class="th"><span class="t">${m2hm(r.from)}</span>
+        <span class="ic">${ICON.warn}</span>
+        <span class="lbl">дома один до ${m2hm(r.to)}</span></div>
+      <div class="leg"><b></b><div><span>${kidLabel(r.kid)}</span>
+        <i>${dur(r.span)} без взрослых, разрешено ${dur(r.cap)}</i></div></div>
+    </div>`;
 }
 
 function renderNow() {
@@ -231,6 +248,7 @@ function renderNow() {
   for (const x of p.trips) if (x.home > t - 3) items.push({ at: x.depart, html: tripRow(x, t) });
   for (const r of unattended(p, new Date())) if (r.at > t - 3) items.push({ at: r.at, html: aloneCard(r) });
   for (const g of spareBlocks(p, new Date())) if (g.to > t) items.push({ at: g.from, html: spareCard(g) });
+  for (const r of aloneAtHome(p, new Date())) if (r.to > t) items.push({ at: r.from, html: aloneCardHome(r) });
   items.sort((a, b) => a.at - b.at);
 
   const forced = ((S.cache.pickUp || {})[dayKey()] || []).length;
@@ -249,10 +267,9 @@ function renderNow() {
   $('#update-strip').innerHTML = VAULT_NEW
     ? `<button data-act="vault">Расписание обновилось — загрузить по коду →</button>` : '';
 
-  const as = assumptions();
-  $('#assume-strip').innerHTML = as.length
-    ? `<button data-act="assume">Я кое-что домыслил при разборе заметки — ${as.length} ${
-        as.length === 1 ? 'место' : as.length < 5 ? 'места' : 'мест'}. Проверить →</button>` : '';
+  $('#assume-strip').innerHTML = p.learned
+    ? `<span>${p.learned === 'yes' ? 'Запомнил: катаемся вместе — не переспрашиваю.'
+                                   : 'Запомнил: развозим по домам — не переспрашиваю.'}</span>` : '';
 }
 
 /* ── VAULT ─────────────────────────────────────────────────────────── */
@@ -273,7 +290,8 @@ function classesOn(date) {
     const m = rows.find(r => r.key === key);
     if (m) { m.kids.push(k); m.refs.push(a.id); }
     else rows.push({ key, title:a.title, teacher:a.teacher, placeId:a.placeId,
-                     start:a.start, end:a.end, kids:[k], refs:[a.id] });
+                     start:a.start, end:a.end, once:a.once, note:a.note, remark:a.remark,
+                     kids:[k], refs:[a.id] });
   }
   rows.sort((x, y) => (x.start - y.start) || (x.end - y.end));
   /* раскладка по колонкам: занятие уходит вправо, если идёт поверх другого */
@@ -287,8 +305,17 @@ function classesOn(date) {
   return rows;
 }
 
+/* допущение показываем на самом событии, а не отдельным списком внизу */
+function noteOf(c) {
+  const done = S.cache.okNotes || [];
+  if (!c.note || !/ЗАМЕТКА/.test(c.note)) return '';
+  if (c.refs.every(id => done.includes(id))) return '';
+  return c.note.replace(/^ЗАМЕТКА:\s*/, '');
+}
+
 function renderWeek() {
-  const t0 = new Date(), out = [];
+  WEEKDATE = new Date();
+  const t0 = WEEKDATE, out = [];
   WEEKROWS = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i);
@@ -304,13 +331,15 @@ function renderWeek() {
       return `<button class="cls${c.col ? ' over' : ''}" style="--col:${c.col}"
                 data-act="edit-cls" data-idx="${idx}">
           <b>${m2hm(c.start)}<br>${m2hm(c.end)}</b>
-          <div><span>${esc(c.title)}</span>
+          <div><span>${esc(c.title)}${c.once ? ' <span class="badge">разово</span>' : ''}</span>
             <i>${c.kids.map(kidLabel).join(', ')}${
               (place(c.placeId)?.name || '') === c.title ? ''
-                : ' · ' + esc(place(c.placeId)?.name || '?')}</i></div>
+                : ' · ' + esc(place(c.placeId)?.name || '?')}</i>
+            ${c.remark ? `<span class="crem">${esc(c.remark)}</span>` : ''}
+            ${noteOf(c) ? `<span class="cnote">${esc(noteOf(c))}</span>` : ''}</div>
         </button>`;
     }).join('') || '<div class="wempty">занятий нет</div>');
-    out.push(`<button class="wadd" data-act="add-cls" data-dow="${d.getDay()}">+ занятие</button>`);
+
   }
   $('#week').innerHTML = out.join('');
   $('#kid-strip').innerHTML = S.kids.map(k =>
@@ -346,15 +375,35 @@ function renderCls() {
   const [, a] = findAct(refs[0]);
   const opts = S.places.map(p => [p.id, p.name]);
 
+  const understood = a.remark ? applyRemark({ ...a, drop:{...a.drop}, pick:{...a.pick} }) : [];
+
+  const done = S.cache.okNotes || [];
+  const openNote = (a.note && /ЗАМЕТКА/.test(a.note) && !refs.every(id => done.includes(id)))
+    ? a.note.replace(/^ЗАМЕТКА:\s*/, '') : '';
+
   $('#cls-form').innerHTML =
+    (openNote ? `<div class="grp"><div class="cap">Я это домыслил</div>
+        <div class="hint" style="color:var(--warn)">${esc(openNote)}</div>
+        <button class="row add" data-act="note-ok">Понятно, так и есть</button></div>` : '') +
     fWide('Название', a.title, v => setAll(x => x.title = v)) +
     fWide('Педагог', a.teacher || '', v => setAll(x => x.teacher = v)) +
     fSel('Место', a.placeId, opts, v => setAll(x => x.placeId = v)) +
     `<button class="row add" data-act="add-place-here">+ новый адрес</button>` +
-    `<div class="days">${DOW.map((d, i) =>
-       `<button data-day="${i}" class="${a.days.includes(i) ? 'on' : ''}">${d}</button>`).join('')}</div>` +
+    (a.once
+      ? fRow('Дата', `<input type="date" value="${esc(a.once)}"
+              data-b="${bind(v => setAll(x => x.once = v))}">`)
+      : `<div class="days">${DOW.map((d, i) =>
+          `<button data-day="${i}" class="${a.days.includes(i) ? 'on' : ''}">${d}</button>`).join('')}</div>`) +
     fTime('Начало', a.start, v => setAll(x => x.start = v)) +
     fTime('Конец', a.end, v => setAll(x => { x.end = v; if (x.pick.earliest < v) x.pick.earliest = v; })) +
+
+    `<div class="grp"><div class="cap">Пожелания</div>` +
+      fWide('Своими словами', a.remark || '',
+            v => { setAll(x => x.remark = v); setAll(x => applyRemark(x)); render(); }) +
+      `<div class="hint">${understood.length
+         ? 'Понял так: ' + understood.map(esc).join('; ') + '.'
+         : 'Например: «приезжать за 20 минут до начала», «забирать не позже 18:40», «сами дойдут».'}</div>` +
+    `</div>` +
 
     `<div class="grp"><div class="cap">Кто ходит</div>` +
       S.kids.map(k => fChk((k.icon ? k.icon + ' ' : '') + k.name,
@@ -387,7 +436,10 @@ function renderKid(id) {
   $('#kid-form').innerHTML =
     fWide('Имя', k.name, v => { k.name = v; }) +
     fWide('Картинка (эмодзи)', k.icon || '', v => { k.icon = v.trim().slice(0, 4); }) +
-    `<div class="hint">${k.icon || '—'} ${esc(k.name)}</div>`;
+    fNum('Один дома не дольше, мин', k.maxAlone == null ? 180 : k.maxAlone,
+         v => { k.maxAlone = v; }, 0, 600) +
+    `<div class="hint">${k.icon || '—'} ${esc(k.name)}${
+       (k.maxAlone === 0) ? ' · одного дома не оставляем' : ''}</div>`;
 }
 
 /* ── ДОПУЩЕНИЯ ─────────────────────────────────────────────────────── */
@@ -473,11 +525,36 @@ function renderPlace(id) {
     fWide('Название', p.name, v => p.name = v) +
     fWide('Адрес', p.address, v => { p.address = v; p.approx = true; }) +
     fRow('Координаты', `<input type="text" value="${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}" data-b="${coordBind}">`) +
+    `<div class="f wide"><label>Поиск на карте</label>
+        <input type="text" id="pl-q" placeholder="как вы называете это место"
+               value="${esc(p.address || '')}" autocomplete="off"></div>
+     <div id="pl-hits"></div>` +
     `<button class="row add" data-act="geo">Определить по адресу</button>` +
     (p.home ? '' : fChk('Это дом', false,
        () => { S.places.forEach(x => x.home = false); p.home = true; save(); render(); })) +
     `<div class="hint" id="geo-st">${p.approx ? 'координаты приблизительные — уточните' : ''}</div>`;
 }
+
+/* поиск адреса: набираем как удобно, выбираем из найденного */
+let plTimer = null;
+document.addEventListener('input', e => {
+  if (e.target.id !== 'pl-q') return;
+  clearTimeout(plTimer);
+  const q = e.target.value;
+  const box = $('#pl-hits');
+  plTimer = setTimeout(async () => {
+    box.innerHTML = '<div class="hint">ищу…</div>';
+    const hits = await suggest(q);
+    PLHITS = hits;
+    box.innerHTML = hits.length
+      ? hits.map((h, i) => `<button class="row two" data-act="pl-pick" data-i="${i}">
+            <span class="n">${esc(h.label.split(',').slice(0, 3).join(','))}</span>
+            <span class="s">${h.exact ? 'точный дом' : 'примерно'} · ${
+              h.lat.toFixed(5)}, ${h.lon.toFixed(5)}</span></button>`).join('')
+      : '<div class="hint">ничего не нашлось — попробуйте иначе или вбейте координаты</div>';
+  }, 600);
+});
+let PLHITS = [];
 
 /* ── ЗАМЕТКА ───────────────────────────────────────────────────────── */
 function renderNotes() {
@@ -591,8 +668,14 @@ document.addEventListener('click', async e => {
   }
   if (act === 'ride-yes' || act === 'ride-no') {
     const dk = dayKey();
+    /* запоминаем не только ответ на сегодня, но и привычку */
+    const yes = act === 'ride-yes';
+    S.cache.learn = S.cache.learn || {};
+    const kidId = (plan().offer && plan().offer.kid && plan().offer.kid.id) || 'all';
+    const L = S.cache.learn[kidId] || (S.cache.learn[kidId] = { yes:0, no:0 });
+    yes ? L.yes++ : L.no++;
     S.cache.rideOk = S.cache.rideOk || {};
-    S.cache.rideOk[dk] = (act === 'ride-yes');
+    S.cache.rideOk[dk] = yes;
     for (const k of Object.keys(S.cache.rideOk))
       if (k < dayKey(new Date(Date.now() - 3 * 864e5))) delete S.cache.rideOk[k];
     save(); invalidate(); return render();
@@ -604,15 +687,21 @@ document.addEventListener('click', async e => {
     EDITING = { refs: [...row.refs] };
     return go('cls');
   }
-  if (act === 'add-cls') {
+  if (act === 'add-menu')   { $('#add-menu').hidden = false; return; }
+  if (act === 'add-cancel') { $('#add-menu').hidden = true;  return; }
+  if (act === 'add-once' || act === 'add-weekly') {
+    $('#add-menu').hidden = true;
     const k = S.kids[0];
-    if (!k) { alert('Сначала добавьте ребёнка'); return; }
-    const a = { id: uid('a_'), title:'Новое занятие', teacher:'',
+    if (!k) { FLASH = 'Сначала добавьте ребёнка'; return render(); }
+    const d = new Date();
+    const a = { id: uid('a_'), title: act === 'add-once' ? 'Разовое событие' : 'Новое занятие',
+      teacher:'', remark:'',
       placeId: (S.places.find(p => !p.home) || S.places[0]).id,
-      days: [+b.dataset.dow], start: 16 * 60, end: 17 * 60,
+      days: [d.getDay()], start: 16 * 60, end: 17 * 60,
       drop: { on:true, leadMin:10, modes:['car'] },
       pick: { on:true, must:true, earliest:17 * 60, latest:17 * 60 + 20,
               serviceMin:5, modes:['car'] } };
+    if (act === 'add-once') a.once = dayKey(d);
     k.activities.push(a); save(); invalidate();
     EDITING = { refs: [a.id] };
     return go('cls');
@@ -646,6 +735,14 @@ document.addEventListener('click', async e => {
   if (act === 'del-place') {
     S.places = S.places.filter(p => p.id !== cur().p); save(); invalidate(); return back();
   }
+  if (act === 'pl-pick') {
+    const h = PLHITS[+b.dataset.i]; if (!h) return;
+    const p = place(cur().p);
+    Object.assign(p, { lat:h.lat, lon:h.lon, approx: !h.exact, needsGeo:false,
+                       address: p.address || h.label });
+    save(); await ensureMatrix(true); invalidate(); return render();
+  }
+
   if (act === 'geo') {
     const p = place(cur().p), st = $('#geo-st'); st.textContent = 'ищу…';
     try {
@@ -674,6 +771,10 @@ document.addEventListener('click', async e => {
 
   /* — допущения — */
   if (act === 'assume') return go('assume');
+  if (act === 'note-ok') {
+    S.cache.okNotes = [...(S.cache.okNotes || []), ...editRefs()];
+    save(); return render();
+  }
   if (act === 'assume-ok') {
     S.cache.okNotes = [...(S.cache.okNotes || []), b.dataset.id];
     save(); return render();
@@ -763,6 +864,10 @@ document.addEventListener('click', async e => {
     load(); invalidate(); stack = [{ v:'now' }]; return render();
   }
 });
+
+addEventListener('scroll', () => {
+  document.body.classList.toggle('scrolled', scrollY > 4);
+}, { passive: true });
 
 /* ── старт ─────────────────────────────────────────────────────────── */
 (async function boot() {

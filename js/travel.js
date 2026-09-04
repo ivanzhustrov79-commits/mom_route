@@ -149,6 +149,23 @@ function walk(aId, bId) {
 }
 
 /* ── geocoding (OpenStreetMap Nominatim — free, no key) ────────────── */
+/* Несколько подсказок по тому, что человек набрал — выбрать глазами
+   надёжнее, чем угадывать за него.                                    */
+async function suggest(q) {
+  if (!q || q.trim().length < 4) return [];
+  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q='
+            + encodeURIComponent(q);
+  try {
+    const r = await fetch(url, { headers: { 'Accept-Language':'ru' },
+                                 signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return [];
+    return (await r.json())
+      .sort((a, b) => (b.place_rank || 0) - (a.place_rank || 0))
+      .map(x => ({ label: x.display_name, lat:+x.lat, lon:+x.lon,
+                   exact: (x.place_rank || 0) >= 30 }));
+  } catch { return []; }
+}
+
 async function geocode(address) {
   const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q='
             + encodeURIComponent(address);

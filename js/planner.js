@@ -9,11 +9,17 @@
 let FORCE_PICK = new Set(), WAIT_OK = new Set();
 const gapKey = (a, b) => `${a}>${b}`;
 
+/* Занятие идёт в этот день? Разовое событие живёт только своей датой. */
+function activeOn(a, dow, dk) {
+  if (a.once) return a.once === dk;
+  return a.days.includes(dow) && !(a.from && dk < a.from) && !(a.until && dk > a.until);
+}
+
 /* 1 ── turn the weekly settings into concrete stops for one date ─────── */
 function buildStops(date) {
   const dow = date.getDay(), out = [];
   const dk = dayKey(date);
-  const onDay = a => a.days.includes(dow) && !(a.from && dk < a.from) && !(a.until && dk > a.until);
+  const onDay = a => activeOn(a, dow, dk);
   for (const k of S.kids) {
     const today = k.activities.filter(onDay).sort((x, y) => x.start - y.start);
     for (let i = 0; i < today.length; i++) {
@@ -243,9 +249,9 @@ function planDayInner(date) {
    меньше времени, чем дорога между ними, виновато расписание.          */
 function dayConflicts(date = new Date()) {
   const dow = date.getDay(), dk = dayKey(date), out = [];
-  const onDay = a => a.days.includes(dow) && !(a.from && dk < a.from) && !(a.until && dk > a.until);
+  const onDay = a => activeOn(a, dow, dk);
   for (const k of S.kids) {
-    const t = k.activities.filter(onDay).sort((x, y) => x.start - y.start);
+    const t = k.activities.filter(a => activeOn(a, dow, dk)).sort((x, y) => x.start - y.start);
     for (let i = 1; i < t.length; i++) {
       const A = t[i - 1], B = t[i];
       if (A.placeId === B.placeId) continue;
@@ -268,9 +274,7 @@ function unattended(p, date = new Date()) {
     if (s.kind === 'pick') for (const id of s.kidIds) collected.add(id + '|' + s.placeId);
 
   for (const k of S.kids) {
-    const today = k.activities
-      .filter(a => a.days.includes(dow) && !(a.from && dk < a.from) && !(a.until && dk > a.until))
-      .sort((x, y) => x.start - y.start);
+    const today = k.activities.filter(a => activeOn(a, dow, dk)).sort((x, y) => x.start - y.start);
     const last = today[today.length - 1];
     if (!last || place(last.placeId)?.home) continue;
     if (collected.has(k.id + '|' + last.placeId)) continue;
@@ -281,6 +285,37 @@ function unattended(p, date = new Date()) {
                      kids:[k], actIds:[last.id] });
   }
   return rows.sort((a, b) => a.at - b.at);
+}
+
+/* 10 ── сколько ребёнок остаётся дома один ───────────────────────────
+   Ребёнок дома с того момента, как добрался, и до конца дня. Мама в это
+   время может уехать — вот эти промежутки и считаем.                  */
+function aloneAtHome(p, date = new Date()) {
+  const dow = date.getDay(), dk = dayKey(date), home = homePlace().id, out = [];
+  const away = p.trips.map(t => ({ from: t.depart, to: t.home, kids: new Set(t.kidIds) }));
+
+  for (const k of S.kids) {
+    const cap = k.maxAlone == null ? 180 : k.maxAlone;
+    const today = k.activities.filter(a => activeOn(a, dow, dk)).sort((x, y) => x.start - y.start);
+    const last = today[today.length - 1];
+    if (!last) continue;
+
+    /* когда ребёнок оказался дома: забрала мама или дошёл сам */
+    let homeAt = null;
+    for (const t of p.trips)
+      for (const s of t.stops)
+        if (s.kind === 'pick' && s.placeId === last.placeId && s.kidIds.includes(k.id))
+          homeAt = t.home;
+    if (homeAt == null) homeAt = last.end + walk(last.placeId, home);
+
+    for (const a of away) {
+      if (a.to <= homeAt || a.kids.has(k.id)) continue;      // уехала раньше или взяла с собой
+      const span = a.to - Math.max(a.from, homeAt);
+      if (span > cap)
+        out.push({ kid: k, from: Math.max(a.from, homeAt), to: a.to, span, cap });
+    }
+  }
+  return out.sort((a, b) => a.from - b.from);
 }
 
 /* 7 ── свободные окна: где мама и сколько времени ────────────────────

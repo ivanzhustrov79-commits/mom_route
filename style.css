@@ -16,7 +16,11 @@ body{
 #app{max-width:460px;margin:0 auto;padding:0 22px env(safe-area-inset-bottom) 22px}
 
 /* bar */
-#bar{display:flex;align-items:center;gap:12px;height:58px;padding-top:env(safe-area-inset-top)}
+#bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+     height:58px;padding-top:env(safe-area-inset-top);background:var(--bg)}
+#bar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line);
+            opacity:0;transition:opacity .15s}
+body.scrolled #bar::after{opacity:1}
 #crumb{flex:1;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut)}
 .ico{background:none;border:0;color:var(--ink);font:inherit;font-size:19px;line-height:1;
      padding:6px;cursor:pointer;opacity:.55}
@@ -30,10 +34,9 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .foot{margin:40px 0 24px;font-size:11px;color:var(--mut);text-align:center}
 
 /* hero */
-#hero{padding:34px 0 26px;min-height:calc(100vh - 104px);
-      min-height:calc(100dvh - 104px);display:flex;flex-direction:column}
-#hero .grow{flex:1;min-height:0;order:2}
-#hero-more{margin-top:26px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+#hero{padding:30px 0 22px}
+#hero .grow{display:none}
+#hero-more{margin-top:22px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
 #hero-sub .legs .leg span{font-size:17px}
 #hero-sub .legs .leg b{font-size:15px}
 #trips-cap{margin:0 0 4px}
@@ -57,12 +60,14 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 #vault-msg.bad{color:var(--hot)}
 
 /* week */
-.wd{margin:34px 0 2px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
+.wd{position:sticky;top:calc(58px + env(safe-area-inset-top));z-index:10;
+     margin:38px 0 0;padding:10px 0 12px;background:var(--bg);
+     font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut)}
 .wd.today{color:var(--ink)}
-.wd:first-child{margin-top:8px}
+.wd:first-child{margin-top:0}
 .cls{display:flex;gap:14px;width:100%;text-align:left;background:none;border:0;
      color:var(--ink);font:inherit;cursor:pointer;
-     padding:13px 0;border-top:1px solid var(--line);
+     padding:15px 0;border-top:1px solid var(--line);
      margin-left:calc(var(--col, 0) * 18px);
      width:calc(100% - var(--col, 0) * 18px)}
 .cls:active{opacity:.5}
@@ -76,6 +81,24 @@ code{font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .cls i{display:block;font-style:normal;font-size:12px;color:var(--mut);margin-top:3px;line-height:1.45}
 .wempty{padding:14px 0;border-top:1px solid var(--line);font-size:14px;color:var(--mut)}
 .wconf{padding:12px 0;border-top:1px solid var(--hot);font-size:13px;color:var(--hot);line-height:1.5}
+
+/* одна кнопка «плюс» на календаре */
+#fab{position:fixed;right:calc(50% - 230px + 22px);bottom:26px;z-index:30;
+     width:48px;height:48px;border-radius:50%;border:1px solid var(--line);
+     background:var(--bg);color:var(--ink);font:300 26px/1 -apple-system,system-ui;
+     cursor:pointer;box-shadow:0 2px 14px rgba(0,0,0,.10)}
+@media (max-width:504px){ #fab{right:22px} }
+#fab:active{opacity:.6}
+#add-menu{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);
+          border-top:1px solid var(--line);padding:10px 22px calc(22px + env(safe-area-inset-bottom));
+          max-width:460px;margin:0 auto}
+#add-menu .row{border-bottom:1px solid var(--line)}
+#add-menu .row.add{border-bottom:0;color:var(--mut)}
+
+/* приписка и допущение прямо на событии */
+.cnote{display:block;font-size:12px;line-height:1.5;margin-top:6px;color:var(--warn)}
+.cnote b{font-weight:400}
+.crem{display:block;font-size:12px;line-height:1.5;margin-top:6px;color:var(--mut)}
 
 /* assumptions */
 #update-strip{margin-top:30px}

@@ -34,7 +34,8 @@ function defaults() {
     pick: { on:true, must:true, earliest:18*60+20, latest:18*60+50,
             serviceMin:8, modes:['car','walk'] }
   };
-  const mk = (name, icon, tpl) => ({ id: uid('k_'), name, icon,
+  /* maxAlone — сколько минут ребёнку можно быть дома одному. 0 = нельзя. */
+  const mk = (name, icon, alone, tpl) => ({ id: uid('k_'), name, icon, maxAlone: alone,
                                      activities: [ { id: uid('a_'), ...structuredClone(tpl) } ] });
 
   /* координаты — центр Москвы, пока не задан настоящий адрес */
@@ -46,7 +47,7 @@ function defaults() {
     places: [ { ...blank('home', 'Дом'), home:true },
               blank('school', 'Школа'),
               blank('kg', 'Садик') ],
-    kids: [ mk('Старший', '🙂', school), mk('Младший', '🙂', kg) ],
+    kids: [ mk('Старший', '🙂', 180, school), mk('Младший', '🙂', 0, kg) ],
     cfg: {
       seats: 5,             // мест в машине (не считая взрослого)
       tripPenalty: 22,      // «стоимость» одного лишнего выезда, мин
@@ -66,7 +67,7 @@ function defaults() {
       syncHours: 2
     },
     cache: { matrix: {}, syncedAt: 0, note: '', okNotes: [],
-             rideOk: {}, stayOut: {}, pickUp: {} }
+             rideOk: {}, stayOut: {}, pickUp: {}, learn: {} }
   };
 }
 
