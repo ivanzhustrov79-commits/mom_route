@@ -580,6 +580,13 @@ async function liveVersion() {
   catch { return null; }
 }
 
+/* Полная зачистка: старый воркер мог остаться с тех времён, когда он ещё
+   кэшировал файлы, и продолжать отдавать вчерашний код. */
+async function hardRefresh() {
+  await dropCaches();
+  location.reload();
+}
+
 async function checkAppUpdate() {
   const v = await liveVersion();
   if (!v) return;
