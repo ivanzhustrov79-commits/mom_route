@@ -646,6 +646,15 @@ function renderSettings() {
   notifyReport();
 
   const c2 = S.cfg;
+  if (isNative()) {
+    $('#push-cfg').innerHTML =
+      `<div class="hint">Приложение запущено в нативной оболочке — напоминания
+       планирует сама iOS, воркер не нужен.${S.cache.nativeAt
+         ? ' Разложено будильников: ' + (S.cache.nativeCount || 0) + '.' : ''}</div>
+       <button class="row add" data-act="native-sync">Переложить будильники</button>
+       <div class="hint" id="push-st"></div>`;
+    return;
+  }
   $('#push-cfg').innerHTML =
     fWide('Адрес воркера', c2.pushUrl, v => c2.pushUrl = v.trim()) +
     fWide('Общий пароль', c2.pushSecret, v => c2.pushSecret = v.trim()) +
@@ -1078,6 +1087,12 @@ document.addEventListener('click', async e => {
         (r.delay ? `<br>задержка из-за пробок: ${Math.round(r.delay / 60)} мин` : '');
     return;
   }
+  if (act === 'native-sync') {
+    const o = $('#push-st'); o.textContent = 'раскладываю…';
+    const r = await nativeSchedule();
+    o.textContent = r.ok ? `разложено будильников: ${r.count}` : 'не вышло: ' + r.msg;
+    return;
+  }
   if (act === 'push-on' || act === 'push-test' || act === 'push-off') {
     const o = $('#push-st'); o.textContent = 'секунду…';
     try {
@@ -1137,6 +1152,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   render();
   measureBar();
   if (S.cfg.geo && isParent()) geoStart();
+  nativeInit();                     // в нативной оболочке — локальные уведомления
 
   checkAppUpdate();
   /* установленное приложение просыпается, а не запускается — проверим и тут */

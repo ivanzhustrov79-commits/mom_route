@@ -1,0 +1,12 @@
+{
+  "appId": "com.zhustrov.momroute",
+  "appName": "Маршрут",
+  "webDir": "www",
+  "server": {
+    "url": "https://ivanzhustrov79-commits.github.io/mom_route/",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

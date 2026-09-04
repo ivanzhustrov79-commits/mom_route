@@ -8,3 +8,6 @@ NOTES.local.md
 worker/.vapid.json
 worker/.wrangler/
 node_modules/
+
+native/node_modules/
+native/ios/

@@ -180,12 +180,24 @@ next open with the real time remaining rather than swallowed. That makes a
 Shortcuts automation — *Время суток → Открыть приложение* a few times a day —
 a working, free substitute.
 
-### The native route
+### The native route — `native/`
 
-`UNCalendarNotificationTrigger` schedules the whole day ahead and fires with the
-app shut, no server and nothing leaving the phone. `js/planner.js` is pure
-functions over a state object and ports across unchanged. A native app would also
-get traffic-aware ETAs free from `MKDirections.calculateETA()`, with no API key.
+A Capacitor shell whose only job is local notifications: iOS schedules them
+itself, so they fire with the app closed, with no server, no keys and nobody
+else in the loop.
+
+The interface is not duplicated. `server.url` points at the same GitHub Pages
+build, so screen changes still arrive without rebuilding anything — the shell
+needs rebuilding roughly never. Inside it the app schedules the coming week
+directly and the Cloudflare worker is not used at all; settings says so.
+
+iOS keeps at most 64 pending local notifications per app, so the nearest 60 are
+scheduled and rewritten every time the app is opened.
+
+Build on a Mac with `native/README.md`. A free Apple ID is enough — **local**
+notifications need no paid membership; it is push that does. The free signing
+certificate lasts 7 days, after which Xcode has to run it again; the $99/year
+programme turns that into a year and adds TestFlight.
 
 ## Files
 

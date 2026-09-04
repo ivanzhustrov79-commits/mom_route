@@ -1,0 +1,14 @@
+{
+  "name": "momroute-shell",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Нативная оболочка: нужна только ради локальных уведомлений",
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0"
+  }
+}
