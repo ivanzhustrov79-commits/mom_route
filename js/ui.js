@@ -281,7 +281,7 @@ function renderNow() {
 
     /* Уехали или нет — вопрос факта, а не расписания. Верим отметке, потом
        геолокации, и только потом часам.                                   */
-    const atStart = nearPlace(st.from);
+    const atStart = isParent() ? nearPlace(st.from) : null;
     const gone = mark.left ? true : (atStart === true ? false : null);
     const late = t - st.leave;
     let eta = st.arrive;
@@ -622,8 +622,16 @@ function renderSettings() {
     fChk('Учитывать пробки', c.traffic, v => c.traffic = v) +
     fNum('Шаг закрывается сам через, мин', c.graceMin == null ? 25 : c.graceMin,
          v => c.graceMin = v, 5, 120) +
-    fChk('Подсказывать по местоположению', c.geo,
-         v => { c.geo = v; v ? geoStart() : geoStop(); }) +
+    /* Местоположение — только для того, кто за рулём, и только на его
+       телефоне. Детям не предлагаем вовсе: за ними следит «Локатор», а не
+       это приложение.                                                    */
+    (isParent()
+      ? fChk('Подсказывать по местоположению', c.geo,
+             v => { c.geo = v; v ? geoStart() : geoStop(); }) +
+        `<div class="hint">Включается на каждом телефоне отдельно и никуда не
+         передаётся: нужно только чтобы понять, выехали вы уже или ещё нет.
+         Детям эта настройка не показывается.</div>`
+      : '') +
     (c.provider === 'tomtom' ? fWide('Ключ TomTom', c.tomtomKey, v => c.tomtomKey = v) : '') +
     (c.provider === 'yandex'
       ? fWide('Ключ Яндекса', c.yandexKey, v => c.yandexKey = v) +
@@ -1128,7 +1136,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
   else if (!S.me.role && S.kids.length) stack = [{ v:'who' }];
   render();
   measureBar();
-  if (S.cfg.geo) geoStart();
+  if (S.cfg.geo && isParent()) geoStart();
 
   checkAppUpdate();
   /* установленное приложение просыпается, а не запускается — проверим и тут */
