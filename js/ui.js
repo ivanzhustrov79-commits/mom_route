@@ -33,7 +33,7 @@ const cur = () => stack[stack.length - 1];
 function go(v, p) { stack.push({ v, p }); render(); }
 function back() { if (stack.length > 1) stack.pop(); render(); }
 
-const TITLES = { now:'', vault:'Код', week:'Календарь', cls:'Занятие', kid:'Ребёнок',
+const TITLES = { now:'', who:'Кто вы', vault:'Код', week:'Календарь', cls:'Занятие', kid:'Ребёнок',
                  assume:'Допущения', settings:'Настройки', place:'Адрес',
                  notes:'Расписание из заметки' };
 
@@ -54,10 +54,10 @@ function render() {
   $('#v-' + t.v).hidden = false;
   $('#back').hidden = stack.length < 2;
   const nav = $('#nav');
-  nav.hidden = !(t.v === 'now' || t.v === 'week');
+  nav.hidden = !((t.v === 'now') || (t.v === 'week' && isParent()));
   nav.innerHTML = t.v === 'now' ? ICON.cal : t.v === 'week' ? ICON.cfg : '';
   $('#crumb').textContent = t.v === 'now' ? dateLine() : TITLES[t.v] || '';
-  ({ now:renderNow, vault:renderVault, week:renderWeek, cls:renderCls, kid:renderKid,
+  ({ now:renderNow, who:renderWho, vault:renderVault, week:renderWeek, cls:renderCls, kid:renderKid,
      assume:renderAssume, settings:renderSettings, place:renderPlace,
      notes:renderNotes })[t.v](t.p);
 }
@@ -66,6 +66,33 @@ const dateLine = () => { const d = new Date();
   return `${DOW[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]}`; };
 const dur = m => { m = Math.round(m);
   return m < 60 ? m + ' мин' : (m / 60 | 0) + ' ч ' + String(m % 60).padStart(2, '0') + ' м'; };
+
+/* ── роли ──────────────────────────────────────────────────────────
+   Взрослый видит весь день. Ребёнок — только то, что касается его: свои
+   занятия и свои поездки. Это удобство, а не защита: данные всё равно
+   лежат на устройстве целиком.                                        */
+const isParent = () => S.me.role === 'dad' || S.me.role === 'mom';
+const meKid    = () => S.me.role === 'kid' ? kid(S.me.kidId) : null;
+const mineOnly = ids => { const k = meKid(); return !k || ids.includes(k.id); };
+
+function myTrips(p) {
+  const k = meKid();
+  return k ? p.trips.filter(t => t.kidIds.includes(k.id)) : p.trips;
+}
+
+function renderWho() {
+  const rows = [
+    { role:'dad', kidId:'', label:'Папа', sub:'полный доступ' },
+    { role:'mom', kidId:'', label:'Мама', sub:'полный доступ' },
+    ...S.kids.filter(k => (k.maxAlone || 0) > 0).map(k =>
+      ({ role:'kid', kidId:k.id, label:kidLabel(k), sub:'только свои занятия и поездки' }))
+  ];
+  $('#who-list').innerHTML = rows.map(r =>
+    `<button class="row two" data-act="who-set" data-role="${r.role}" data-kid="${esc(r.kidId)}">
+       <span class="n">${r.label}${
+         S.me.role === r.role && S.me.kidId === r.kidId ? '<span class="badge">это я</span>' : ''}</span>
+       <span class="s">${esc(r.sub)}</span></button>`).join('');
+}
 
 /* имя ребёнка всегда со своей картинкой */
 const kidLabel = k => `${k.icon ? k.icon + ' ' : ''}${esc(k.name)}`;
@@ -231,7 +258,8 @@ function aloneCardHome(r) {
 }
 
 function renderNow() {
-  const p = plan(), t = nowMin();
+  const full = plan(), t = nowMin();
+  const p = meKid() ? { ...full, trips: myTrips(full), skipped: [] } : full;
   const done = stepDone();
   const st = nextStep(p, t, new Date(), done);
   const hero = $('#hero');
@@ -327,9 +355,11 @@ function renderNow() {
   /* весь день одной лентой: выезды, свободные окна, «дойдут сами» */
   const items = [];
   for (const x of p.trips) if (x.home > t - 3) items.push({ at: x.depart, html: tripRow(x, t) });
-  for (const r of unattended(p, new Date())) if (r.at > t - 3) items.push({ at: r.at, html: aloneCard(r) });
-  for (const g of spareBlocks(p, new Date())) if (g.to > t) items.push({ at: g.from, html: spareCard(g) });
-  for (const r of aloneAtHome(p, new Date())) if (r.to > t) items.push({ at: r.from, html: aloneCardHome(r) });
+  if (isParent()) {
+    for (const r of unattended(p, new Date())) if (r.at > t - 3) items.push({ at: r.at, html: aloneCard(r) });
+    for (const g of spareBlocks(p, new Date())) if (g.to > t) items.push({ at: g.from, html: spareCard(g) });
+    for (const r of aloneAtHome(p, new Date())) if (r.to > t) items.push({ at: r.from, html: aloneCardHome(r) });
+  }
   items.sort((a, b) => a.at - b.at);
 
   /* всё, что мама сегодня решила вручную, откатывается одной строкой */
@@ -374,6 +404,7 @@ function classesOn(date) {
     if (a.until && dk > a.until) continue;
     const key = a.title + '|' + a.placeId + '|' + a.start + '|' + a.end;
     const m = rows.find(r => r.key === key);
+    if (!mineOnly([k.id])) continue;
     if (m) { m.kids.push(k); m.refs.push(a.id); }
     else rows.push({ key, title:a.title, teacher:a.teacher, placeId:a.placeId,
                      start:a.start, end:a.end, once:a.once, note:a.note, remark:a.remark,
@@ -428,7 +459,8 @@ function renderWeek() {
 
   }
   $('#week').innerHTML = out.join('');
-  $('#kid-strip').innerHTML = S.kids.map(k =>
+  $('#fab').hidden = !isParent();
+  $('#kid-strip').innerHTML = !isParent() ? '' : S.kids.map(k =>
     `<button class="row" data-go="kid" data-id="${k.id}">${kidLabel(k)}<i>${
       k.activities.length} зан.</i></button>`).join('');
 }
@@ -564,6 +596,9 @@ function renderSettings() {
     `<button class="row" data-go="place" data-id="${p.id}">${esc(p.name)}${
       p.home ? '<span class="badge">дом</span>' : ''}<i>${p.approx ? '≈ ' : ''}${
       p.lat.toFixed(3)}, ${p.lon.toFixed(3)}</i></button>`).join('');
+  const meLabel = S.me.role === 'kid' ? (kid(S.me.kidId)?.name || 'ребёнок')
+                : S.me.role === 'dad' ? 'папа' : S.me.role === 'mom' ? 'мама' : 'не выбрано';
+  if ($('#who-st')) $('#who-st').textContent = meLabel;
   $('#notes-when').textContent = S.cache.syncedAt
     ? new Date(S.cache.syncedAt).toLocaleDateString('ru-RU') : '—';
 
@@ -976,6 +1011,14 @@ document.addEventListener('click', async e => {
   }
 
   /* — заметка — */
+  if (act === 'who') return go('who');
+  if (act === 'who-set') {
+    S.me = { role: b.dataset.role, kidId: b.dataset.kid || '' };
+    save(); invalidate();
+    stack = [{ v:'now' }];
+    return render();
+  }
+
   if (act === 'notes') return go('notes');
   if (act === 'parse') {
     S.cache.note = $('#note-text').value; save();
@@ -1082,6 +1125,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
 /* ── старт ─────────────────────────────────────────────────────────── */
 (async function boot() {
   if (FIRST_RUN && await vaultExists()) stack = [{ v:'vault' }];
+  else if (!S.me.role && S.kids.length) stack = [{ v:'who' }];
   render();
   measureBar();
   if (S.cfg.geo) geoStart();

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 <title>Маршрут</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=202609041057">
+<link rel="stylesheet" href="style.css?v=202609041103">
 </head>
 <body>
 
@@ -47,6 +47,14 @@
       <button class="row add" data-act="vault-open">Открыть</button>
       <div class="hint" id="vault-msg"></div>
     </div>
+  </section>
+
+  <!-- ───────────────────────── WHO ───────────────────────── -->
+  <section id="v-who" class="view" hidden>
+    <div class="cap sec">Кто пользуется этим телефоном</div>
+    <div id="who-list" class="list"></div>
+    <p class="hint">Родители видят весь день и могут всё менять.
+      Ребёнок видит только свои занятия и свои поездки.</p>
   </section>
 
   <!-- ───────────────────────── WEEK ───────────────────────── -->
@@ -87,6 +95,7 @@
     <div class="list">
       <button class="row" data-act="notes">Импорт расписания<i id="notes-when"></i></button>
       <button class="row" data-act="vault">Загрузить по коду</button>
+      <button class="row" data-act="who">Кто пользуется телефоном<i id="who-st"></i></button>
     </div>
 
     <div class="cap sec">Общее</div>
@@ -137,16 +146,16 @@
 
 </div>
 
-<script src="js/state.js?v=202609041057"></script>
-<script src="js/travel.js?v=202609041057"></script>
-<script src="js/planner.js?v=202609041057"></script>
-<script src="js/where.js?v=202609041057"></script>
-<script src="js/notes.js?v=202609041057"></script>
-<script src="js/remark.js?v=202609041057"></script>
-<script src="js/secret.js?v=202609041057"></script>
-<script src="js/idb.js?v=202609041057"></script>
-<script src="js/push.js?v=202609041057"></script>
-<script src="js/notify.js?v=202609041057"></script>
-<script src="js/ui.js?v=202609041057"></script>
+<script src="js/state.js?v=202609041103"></script>
+<script src="js/travel.js?v=202609041103"></script>
+<script src="js/planner.js?v=202609041103"></script>
+<script src="js/where.js?v=202609041103"></script>
+<script src="js/notes.js?v=202609041103"></script>
+<script src="js/remark.js?v=202609041103"></script>
+<script src="js/secret.js?v=202609041103"></script>
+<script src="js/idb.js?v=202609041103"></script>
+<script src="js/push.js?v=202609041103"></script>
+<script src="js/notify.js?v=202609041103"></script>
+<script src="js/ui.js?v=202609041103"></script>
 </body>
 </html>

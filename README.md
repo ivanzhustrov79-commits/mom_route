@@ -10,6 +10,17 @@ browser and all data stays in `localStorage` on the device.
 
 ---
 
+## Who is holding the phone
+
+On first run the app asks: **Папа**, **Мама**, or one of the children old enough
+to carry one. Parents see the whole day and can change anything. A child sees
+only their own classes and the outings they are part of, and has neither the
+calendar editor nor settings.
+
+The role lives on the device. This is politeness rather than security — the data
+sits on the phone in full either way, and a determined child could read it. Real
+separation would need per-person keys, which is a larger change than it sounds.
+
 ## Screens
 
 **`Сегодня`** shows one movement at a time — one drive or one walk, never the
