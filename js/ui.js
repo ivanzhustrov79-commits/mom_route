@@ -184,15 +184,38 @@ const stepMarks = () => (S.cache.steps || {})[dayKey()] || {};
 const stepDone  = () => new Set(Object.entries(stepMarks())
                           .filter(([, v]) => v && v.arrived).map(([k]) => k));
 
-function markStep(key, field) {
+function setStep(key, field, val) {
   const dk = dayKey();
   S.cache.steps = S.cache.steps || {};
   const day = S.cache.steps[dk] = S.cache.steps[dk] || {};
   const cur = day[key] = day[key] || {};
-  cur[field] = cur[field] ? 0 : Math.round(nowMin());   // повторное нажатие снимает
+  if (cur[field] === val) return false;
+  cur[field] = val;
   const old = dayKey(new Date(Date.now() - 3 * 864e5));
   for (const k of Object.keys(S.cache.steps)) if (k < old) delete S.cache.steps[k];
-  save(); invalidate(); render();
+  save(); invalidate();
+  return true;
+}
+
+/* нажатие пальцем — переключатель: поставить и снять */
+function markStep(key, field) {
+  const cur = (stepMarks()[key] || {})[field];
+  setStep(key, field, cur ? 0 : Math.round(nowMin()));
+  render();
+}
+
+/* Если местоположение разрешено, отмечать шаги руками не нужно: уехали от
+   точки отправления — значит выехали, оказались у цели — значит приехали.
+   Кнопки остаются: они и подстраховка, и способ поправить.             */
+function geoAutoStep(p) {
+  if (!S.cfg.geo || !isParent() || !geoFresh()) return false;
+  const st = nextStep(p, nowMin(), new Date(), stepDone());
+  if (!st) return false;
+  const marks = stepMarks()[st.key] || {};
+  if (nearPlace(st.to) === true) return setStep(st.key, 'arrived', Math.round(nowMin()));
+  if (!marks.left && nearPlace(st.from) === false)
+    return setStep(st.key, 'left', Math.round(nowMin()));
+  return false;
 }
 
 /* ── карточки дня ──────────────────────────────────────────────────── */
@@ -324,6 +347,9 @@ function renderNow() {
     $('#hero-sub').innerHTML =
       `<div class="hlead"><span class="ic">${onFoot ? ICON.walk : ICON.car}</span><span>${lead}</span></div>` +
       `<div class="legs">${body}</div>` +
+      (S.cfg.geo && isParent() && geoFresh()
+        ? `<div class="hint" style="margin-top:14px">Слежу по местоположению — отмечать вручную не нужно</div>`
+        : '') +
       `<div class="qb steps">
          <button data-act="step-left" data-key="${esc(st.key)}">${
            mark.left ? '↺ не выехали' : (onFoot ? 'вышли' : 'выехали')}</button>
@@ -666,7 +692,7 @@ function renderSettings() {
           new Date(S.cache.pushAt).toLocaleString('ru-RU',
             { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
         : 'пока не подключено'}</div>`;
-  $('#ver').textContent = 'Маршрут ' + (S.cache.appVersion || '') +
+  $('#ver').textContent = 'Успеваем ' + (S.cache.appVersion || '') +
     ' · данные хранятся только на устройстве';
 }
 
@@ -1174,6 +1200,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', measureBar)
 
   setInterval(() => {
     if (planDK !== dayKey()) invalidate();
+    geoAutoStep(plan());
     checkAlerts(plan());
     if (cur().v === 'now') renderNow();
   }, 10000);

@@ -1,12 +1,17 @@
 {
-  "name": "Маршрут",
-  "short_name": "Маршрут",
+  "name": "Успеваем",
+  "short_name": "Успеваем",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#0b0b0b",
+  "theme_color": "#0b0b0b",
   "icons": [
-    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
