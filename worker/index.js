@@ -31,15 +31,18 @@ async function vapidHeader(endpoint, env) {
   return { jwt: `${head}.${body}.${b64u(sig)}`, pub: env.VAPID_PUBLIC };
 }
 
-/* пуш без тела: телефон сам решит, что показать */
+/* Пуш без тела: телефон сам решит, что показать.
+   Content-Length здесь не выставляем — это запрещённый заголовок, среда
+   его всё равно проставит сама, а попытка задать руками ломает запрос. */
 async function wake(sub, env) {
   const { jwt, pub } = await vapidHeader(sub.endpoint, env);
   const r = await fetch(sub.endpoint, {
     method: 'POST',
-    headers: { TTL: '120', 'Content-Length': '0',
+    headers: { TTL: '120', Urgency: 'high',
                Authorization: `vapid t=${jwt}, k=${pub}` }
   });
-  return r.status;
+  const text = r.ok ? '' : (await r.text().catch(() => '')).slice(0, 300);
+  return { status: r.status, text };
 }
 
 const json = (o, status = 200) =>
@@ -79,7 +82,8 @@ export default {
 
     if (url.pathname === '/test') {
       if (!b.sub) return json({ error: 'no subscription' }, 400);
-      return json({ status: await wake(b.sub, env) });
+      const r = await wake(b.sub, env);          // ответ службы доставки — как есть
+      return json({ status: r.status, detail: r.text });
     }
 
     return json({ error: 'unknown path' }, 404);

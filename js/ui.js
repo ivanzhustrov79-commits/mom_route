@@ -986,8 +986,8 @@ document.addEventListener('click', async e => {
       else if (act === 'push-test') {
         const r = await pushTest();
         o.textContent = r.status >= 200 && r.status < 300
-          ? 'воркер принял, уведомление придёт через несколько секунд'
-          : 'служба доставки ответила ' + r.status;
+          ? `служба доставки приняла (${r.status}) — уведомление придёт за несколько секунд`
+          : `служба доставки ответила ${r.status}${r.detail ? ': ' + r.detail : ''}`;
       } else {
         const r = await pushSync();
         o.textContent = `передано будильников: ${r.queued}`;
