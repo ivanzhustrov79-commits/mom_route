@@ -5,19 +5,43 @@
    подсказка: подтвердить, что выехали, и закрыть шаг по прибытии.
    Всё то же самое можно сделать двумя кнопками, если разрешения нет.   */
 
-let GEO = null, geoWatch = null;
+let GEO = null, geoWatch = null, geoNative = false;
 
-function geoStart() {
-  if (!('geolocation' in navigator) || geoWatch != null) return;
+const took = c => { GEO = { lat: c.latitude, lon: c.longitude,
+                            acc: c.accuracy, at: Date.now() }; };
+
+/* В нативной оболочке WKWebView сам по себе координат не отдаёт — их даёт
+   плагин. Если звать navigator.geolocation, всё молча перестанет работать
+   именно там, где нужнее всего.                                        */
+async function geoStart() {
+  if (geoWatch != null) return;
+  const P = (window.Capacitor && window.Capacitor.Plugins) || null;
+
+  if (P && P.Geolocation) {
+    geoNative = true;
+    try {
+      const perm = await P.Geolocation.requestPermissions();
+      if (perm && perm.location === 'denied') { GEO = null; return; }
+      geoWatch = await P.Geolocation.watchPosition(
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 },
+        pos => { if (pos && pos.coords) took(pos.coords); else GEO = null; });
+    } catch { geoWatch = null; GEO = null; }
+    return;
+  }
+
+  if (!('geolocation' in navigator)) return;
+  geoNative = false;
   geoWatch = navigator.geolocation.watchPosition(
-    p => { GEO = { lat: p.coords.latitude, lon: p.coords.longitude,
-                   acc: p.coords.accuracy, at: Date.now() }; },
-    () => { GEO = null; },
+    p => took(p.coords), () => { GEO = null; },
     { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 });
 }
 
 function geoStop() {
-  if (geoWatch != null) navigator.geolocation.clearWatch(geoWatch);
+  const P = (window.Capacitor && window.Capacitor.Plugins) || null;
+  if (geoWatch != null) {
+    if (geoNative && P && P.Geolocation) P.Geolocation.clearWatch({ id: geoWatch });
+    else navigator.geolocation.clearWatch(geoWatch);
+  }
   geoWatch = null; GEO = null;
 }
 

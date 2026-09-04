@@ -9,6 +9,7 @@
   "dependencies": {
     "@capacitor/core": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
-    "@capacitor/local-notifications": "^7.0.0"
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/geolocation": "^7.0.0"
   }
 }
