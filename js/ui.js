@@ -474,9 +474,17 @@ function renderWeek() {
         «${esc(c.to.title)}» с ${m2hm(c.to.start)}, дорога ${Math.round(c.road)} мин —
         не хватает ${Math.round(c.short)} мин</div>`);
     const rows = classesOn(d);
+    /* Только у сегодняшнего дня — тонкая красная черта «мы вот здесь».
+       Встаёт перед первым занятием, которое ещё не началось.          */
+    const nowAt = i === 0 ? nowMin() : null;
+    let nowPut = nowAt == null;
+    const nowLine = `<div class="nowline"><span>${m2hm(nowAt || 0)}</span></div>`;
+
     out.push(rows.map(c => {
+      let before = '';
+      if (!nowPut && c.start > nowAt) { before = nowLine; nowPut = true; }
       const idx = WEEKROWS.push(c) - 1;
-      return `<button class="cls${c.col ? ' over' : ''}" style="--col:${c.col}"
+      return before + `<button class="cls${c.col ? ' over' : ''}" style="--col:${c.col}"
                 data-act="edit-cls" data-idx="${idx}">
           <b>${m2hm(c.start)}<br>${m2hm(c.end)}</b>
           <div><span>${esc(c.title)}${c.once ? ' <span class="badge">разово</span>' : ''}</span>
@@ -486,7 +494,8 @@ function renderWeek() {
             ${c.remark ? `<span class="crem">${esc(c.remark)}</span>` : ''}
             ${noteOf(c) ? `<span class="cnote">${esc(noteOf(c))}</span>` : ''}</div>
         </button>`;
-    }).join('') || '<div class="wempty">занятий нет</div>');
+    }).join('') + (nowPut ? '' : nowLine)                 // всё уже началось
+      || '<div class="wempty">занятий нет</div>');
 
   }
   $('#week').innerHTML = out.join('');
