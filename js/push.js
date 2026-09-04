@@ -30,15 +30,34 @@ async function pushCall(path, body) {
   return j;
 }
 
-/* подписка живёт в служебном работнике, поэтому без него никак */
+/* Подписка живёт в служебном работнике. Раньше здесь смотрели на глобальную
+   переменную, и если работник ещё не успел зарегистрироваться, ошибка врала
+   про домашний экран. Теперь ждём его честно и называем причину точно.    */
 async function pushSubscribe() {
-  if (!swReg) throw new Error('приложение не установлено на домашний экран');
+  if (!('serviceWorker' in navigator)) throw new Error('браузер без служебных работников');
+  if (!('PushManager' in window))
+    throw new Error('браузер не умеет веб-пуш (на iOS нужен iOS 16.4+ и запуск с домашнего экрана)');
+
+  let reg;
+  try {
+    reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('нет')), 8000))
+    ]);
+  } catch { throw new Error('служебный работник не запустился — откройте приложение с домашнего экрана'); }
+
   if (Notification.permission !== 'granted') {
     if (await askPerm() !== 'granted') throw new Error('нет разрешения на уведомления');
   }
-  return await swReg.pushManager.getSubscription()
-      || await swReg.pushManager.subscribe(
-           { userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC) });
+
+  const have = await reg.pushManager.getSubscription();
+  if (have) return have;
+  try {
+    return await reg.pushManager.subscribe(
+      { userVisibleOnly: true, applicationServerKey: b64ToU8(VAPID_PUBLIC) });
+  } catch (e) {
+    throw new Error('подписка не создалась: ' + (e && e.message ? e.message : e));
+  }
 }
 
 /* будильники на неделю вперёд: текст — сюда, одни лишь времена — воркеру */
@@ -87,7 +106,8 @@ async function pushTest() {
 }
 
 async function pushForget() {
-  const sub = swReg && await swReg.pushManager.getSubscription();
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
   if (sub) { try { await pushCall('/forget', { sub: sub.toJSON() }); } catch {} await sub.unsubscribe(); }
   S.cache.pushAt = 0; S.cache.pushCount = 0; save();
 }

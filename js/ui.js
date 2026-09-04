@@ -582,12 +582,21 @@ async function notifyReport() {
   const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
   let regs = 0;
   try { regs = (await navigator.serviceWorker.getRegistrations()).length; } catch {}
+  let sub = null;
+  try { const r = await navigator.serviceWorker.getRegistration();
+        sub = r && await r.pushManager.getSubscription(); } catch {}
+  const m = navigator.userAgent.match(/OS (\d+)[._](\d+)/);
+  const iosVer = m ? +m[1] + +m[2] / 10 : null;
+
   const rows = [
     ['защищённое соединение (https)', isSecureContext],
     ['браузер умеет уведомления', 'Notification' in window],
+    ['браузер умеет веб-пуш', 'PushManager' in window],
+    [ios ? `iOS ${iosVer || '?'} — нужен 16.4 и новее` : 'версия системы', !ios || (iosVer >= 16.4)],
     ['разрешение выдано', ('Notification' in window) && Notification.permission === 'granted'],
     ['служебный работник зарегистрирован', regs > 0],
-    [ios ? 'добавлено на домашний экран' : 'открыто как приложение', standalone]
+    [ios ? 'запущено с домашнего экрана' : 'открыто как приложение', standalone],
+    ['подписка на фоновые пуши создана', !!sub]
   ];
   box.innerHTML = rows.map(([t, ok]) =>
       `<div class="chk ${ok ? 'y' : 'n'}">${ok ? '✓' : '✗'} ${esc(t)}</div>`).join('') +
